@@ -26,14 +26,37 @@ def test_sound_factory_freesound_requires_key(monkeypatch):
 
 
 def test_sound_factory_partner_requires_credentials(monkeypatch, tmp_path):
-    monkeypatch.delenv("ARTLIST_API_BASE", raising=False)
-    monkeypatch.delenv("ARTLIST_API_TOKEN", raising=False)
+    monkeypatch.delenv("AUDIIO_API_BASE", raising=False)
+    monkeypatch.delenv("AUDIIO_API_TOKEN", raising=False)
     config = _config(
-        sound="artlist",
+        sound="audiio",
         raw={"runtime": {"cache_dir": str(tmp_path)}},
     )
     with pytest.raises(SoundProviderError):
         create_sound_provider(config)
+
+
+def test_sound_factory_artlist_requires_oauth(monkeypatch, tmp_path):
+    monkeypatch.delenv("ARTLIST_CLIENT_ID", raising=False)
+    monkeypatch.delenv("ARTLIST_CLIENT_SECRET", raising=False)
+    config = _config(sound="artlist", raw={"runtime": {"cache_dir": str(tmp_path)}})
+    with pytest.raises(SoundProviderError):
+        create_sound_provider(config)
+
+
+def test_sound_factory_splice_returns_provider(monkeypatch, tmp_path):
+    lib = tmp_path / "Splice"
+    lib.mkdir()
+    (lib / "hit.wav").write_bytes(b"x")
+    config = _config(
+        sound="splice",
+        raw={
+            "runtime": {"cache_dir": str(tmp_path / "cache")},
+            "sound_providers": {"splice": {"library_path": str(lib)}},
+        },
+    )
+    provider = create_sound_provider(config)
+    assert provider.name == "splice"
 
 
 def test_sound_factory_local_requires_library(tmp_path):

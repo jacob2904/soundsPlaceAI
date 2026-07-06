@@ -41,9 +41,11 @@ breakdown.
   hour-long clips fast and affordable. See [`docs/LONG_VIDEOS.md`](docs/LONG_VIDEOS.md).
 - **Pluggable "brain"** — Gemini, OpenAI (GPT-4o/o-series vision), or Claude, chosen at
   runtime by API key.
-- **Pluggable sound platforms** — Epidemic Sound (full Partner API), Artlist, Audiio,
-  Musicbed, a local **Soundly** library, Freesound (free fallback), or a local folder. Add
-  your own by implementing one small interface.
+- **Pluggable sound platforms** — Epidemic Sound (full Partner API) and Freesound (free)
+  for cloud SFX; **Soundly** and **Splice** via their local libraries; Artlist via its
+  Enterprise API (music today); a local folder; plus configurable hooks for Audiio/Musicbed.
+  Which platforms actually expose a usable API is documented honestly in
+  [`docs/PROVIDERS.md`](docs/PROVIDERS.md). Add your own by implementing one small interface.
 - **Beautiful, easy panel** — a polished dark UI with live progress; your choices are
   **saved and can be changed any time** ([`docs/SETTINGS.md`](docs/SETTINGS.md)).
 - **Scene understanding first** — the brain returns structured cues (what to place, when,
@@ -90,6 +92,7 @@ Docs:
 [`INSTALL`](docs/INSTALL.md) ·
 [`ARCHITECTURE`](docs/ARCHITECTURE.md) ·
 [`LONG_VIDEOS`](docs/LONG_VIDEOS.md) ·
+[`PROVIDERS`](docs/PROVIDERS.md) ·
 [`LICENSING`](docs/LICENSING.md) ·
 [`SETTINGS`](docs/SETTINGS.md)
 

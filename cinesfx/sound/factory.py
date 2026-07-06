@@ -5,9 +5,10 @@ from __future__ import annotations
 from cinesfx.config import AppConfig
 from cinesfx.sound.base import SoundProvider, SoundProviderError
 
-# Partner platforms without public APIs share one parameterised REST provider.
+# Platforms with no public developer API. Audiio and Musicbed are enterprise /
+# bespoke only, so they share one parameterised REST provider that partners can
+# point at their credentials; without them it raises a clear, actionable error.
 _PARTNER_ENV = {
-    "artlist": ("ARTLIST_API_BASE", "ARTLIST_API_TOKEN"),
     "audiio": ("AUDIIO_API_BASE", "AUDIIO_API_TOKEN"),
     "musicbed": ("MUSICBED_API_BASE", "MUSICBED_API_TOKEN"),
 }
@@ -37,6 +38,14 @@ def create_sound_provider(config: AppConfig) -> SoundProvider:
         from cinesfx.sound.freesound import FreesoundProvider
 
         return FreesoundProvider(settings, cache_dir)
+    if choice == "artlist":
+        from cinesfx.sound.artlist import ArtlistProvider
+
+        return ArtlistProvider(settings, cache_dir)
+    if choice == "splice":
+        from cinesfx.sound.splice import SpliceProvider
+
+        return SpliceProvider(settings, cache_dir)
     if choice == "soundly":
         from cinesfx.sound.soundly import SoundlyProvider
 

@@ -23,16 +23,15 @@ _BRAIN_ENV = {
     "claude": "ANTHROPIC_API_KEY",
 }
 
-# Cloud sound providers and the secret each needs.
+# Cloud sound providers and the secret each needs (simple single-key check).
 _SOUND_ENV = {
     "epidemic": "EPIDEMIC_API_KEY",
     "freesound": "FREESOUND_API_KEY",
-    "artlist": "ARTLIST_API_TOKEN",
     "audiio": "AUDIIO_API_TOKEN",
     "musicbed": "MUSICBED_API_TOKEN",
 }
 # Folder-based providers that need a local library path instead of a key.
-_SOUND_LOCAL = ("soundly", "local")
+_SOUND_LOCAL = ("soundly", "local", "splice")
 
 
 @dataclass(frozen=True)
@@ -142,6 +141,28 @@ def check_brain(config: AppConfig) -> CheckResult:
 def check_sound(config: AppConfig) -> CheckResult:
     """Check that the selected sound provider is ready (key or library path)."""
     provider = config.sound_provider
+
+    if provider == "artlist":
+        has_id = AppConfig.secret("ARTLIST_CLIENT_ID")
+        has_secret = AppConfig.secret("ARTLIST_CLIENT_SECRET")
+        if has_id and has_secret:
+            return CheckResult("Sounds (artlist)", True, "OAuth credentials set")
+        return CheckResult(
+            "Sounds (artlist)",
+            False,
+            "set ARTLIST_CLIENT_ID and ARTLIST_CLIENT_SECRET (music only; SFX not "
+            "yet exposed by Artlist's API)",
+        )
+
+    if provider == "splice":
+        from cinesfx.sound.splice import resolve_splice_library
+
+        try:
+            library = resolve_splice_library(config.library_path() and str(config.library_path()))
+            return CheckResult("Sounds (splice)", True, f"library: {library}")
+        except Exception as exc:  # noqa: BLE001 - report, never raise
+            return CheckResult("Sounds (splice)", False, str(exc))
+
     if provider in _SOUND_LOCAL:
         library = config.library_path()
         if library and Path(library).expanduser().is_dir():

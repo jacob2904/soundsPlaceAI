@@ -20,26 +20,29 @@ brains:
     temperature: 0.4
     max_output_tokens: 4096
 
-# Which platform the effects come from.
-# One of: epidemic | artlist | audiio | musicbed | soundly | freesound | local
+# Which platform the effects come from. See docs/PROVIDERS.md for the full
+# capability matrix (which platforms actually expose a usable API).
+# One of: epidemic | artlist | audiio | musicbed | splice | soundly | freesound | local
 sound_provider: epidemic
 
 sound_providers:
-  epidemic:
+  epidemic:                           # ✅ real Partner API (SFX). Key in .env.
     quality: high                     # normal (128k) | high (320k)
-  freesound:
+  freesound:                          # ✅ free public API (SFX). Key in .env.
     page_size: 15
-  soundly:
-    # Point this at your local Soundly library / downloads folder.
+  artlist:                            # ⚠ real Enterprise API, but MUSIC only today
+    page_size: 20                     # (SFX not yet exposed by Artlist). Creds in .env.
+    asset_type: song                  # 'song' today; will support 'sfx' when Artlist does
+    format: aac                       # aac | mp3 | wav
+  splice:                             # ✅ via LOCAL Splice folder (no public API exists)
+    library_path: ~/Splice            # auto-detected if omitted (~/Splice, ~/Documents/Splice)
+  soundly:                            # ✅ via LOCAL Soundly library (no public API)
     library_path: ~/Soundly/Library
-  local:
+  local:                              # ✅ any local folder of audio files
     library_path: ~/SFX
-  artlist:
-    # base URL + token come from .env (ARTLIST_API_BASE / ARTLIST_API_TOKEN)
+  audiio:                             # ✗ no public API — enterprise/bespoke only
     page_size: 15
-  audiio:
-    page_size: 15
-  musicbed:
+  musicbed:                           # ✗ no public API — enterprise/bespoke only
     page_size: 15
 
 # Scene analysis (efficiency knobs).

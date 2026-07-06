@@ -26,6 +26,7 @@ VALID_SOUND_PROVIDERS = (
     "artlist",
     "audiio",
     "musicbed",
+    "splice",
     "soundly",
     "freesound",
     "local",
