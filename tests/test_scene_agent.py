@@ -63,6 +63,37 @@ def test_scene_agent_extracts_keyframes(tmp_path):
             assert keyframe.image_path.stat().st_size > 0
 
 
+def test_bound_scene_count_merges_when_too_many(tmp_path):
+    # This logic is pure (no ffmpeg): 1000 shots must collapse to max_scenes,
+    # while still spanning the whole clip (first start .. last end preserved).
+    agent = SceneAgent({"max_scenes": 50}, cache_dir=tmp_path / "cache")
+    boundaries = [(float(i), float(i) + 1.0) for i in range(1000)]
+    merged = agent._bound_scene_count(boundaries)
+    assert len(merged) == 50
+    assert merged[0][0] == 0.0            # first shot's start preserved
+    assert merged[-1][1] == 1000.0        # last shot's end preserved
+    # Coverage is monotonic and contiguous across the merged scenes.
+    for earlier, later in zip(merged, merged[1:]):
+        assert later[0] >= earlier[0]
+
+
+def test_bound_scene_count_keeps_small_lists(tmp_path):
+    agent = SceneAgent({"max_scenes": 400}, cache_dir=tmp_path / "cache")
+    boundaries = [(0.0, 1.0), (1.0, 2.0)]
+    assert agent._bound_scene_count(boundaries) == boundaries
+
+
+def test_resolve_frame_skip_auto_scales_with_length(tmp_path):
+    agent = SceneAgent(
+        {"frame_skip": -1, "long_clip_threshold_seconds": 600, "target_eval_fps": 4.0},
+        cache_dir=tmp_path / "cache",
+    )
+    # Short clip -> frame-accurate (no skipping).
+    assert agent._resolve_frame_skip(duration_seconds=30.0, fps=24.0) == 0
+    # Long clip at 24fps targeting ~4fps -> skip 5 (evaluate every 6th frame).
+    assert agent._resolve_frame_skip(duration_seconds=3600.0, fps=24.0) == 5
+
+
 def test_scene_agent_uses_cache(tmp_path):
     video = tmp_path / "clip.mp4"
     _make_video(video, seconds=1)
