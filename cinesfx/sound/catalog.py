@@ -3,7 +3,7 @@
 Unlike the ``local`` provider (which walks a single folder in memory every run),
 this provider is backed by the persistent :class:`~cinesfx.library.catalog.LibraryCatalog`.
 The user first catalogs *all* of their sounds — across as many folders/drives as
-they like — with the panel's "Scan library" button or ``run_cli --scan-library``.
+they like — with the panel's "Sync library" button or ``run_cli --scan-library``.
 Afterwards, placement searches that fast catalog and drops the user's own files
 straight onto the timeline (they are already local, so there is no download).
 """
@@ -56,8 +56,13 @@ class CatalogProvider(SoundProvider):
     def catalog(self) -> LibraryCatalog:
         return self._catalog
 
-    def scan(self, progress=None):
-        """Build/refresh the catalog from the configured roots."""
+    def scan(self, progress=None, dry_run: bool = False):
+        """Build or **resync** the catalog from the configured roots.
+
+        Calling this again after files change on disk resyncs the catalog
+        (adds new files, refreshes modified ones, prunes deleted ones). Pass
+        ``dry_run=True`` to only detect whether a resync is needed.
+        """
         if not self._roots:
             raise SoundProviderError(
                 "No library folders configured. Set sound_providers.catalog.roots "
@@ -65,7 +70,10 @@ class CatalogProvider(SoundProvider):
                 "that hold your sounds."
             )
         return self._catalog.scan(
-            self._roots, probe_duration=self._probe_duration, progress=progress
+            self._roots,
+            probe_duration=self._probe_duration,
+            progress=progress,
+            dry_run=dry_run,
         )
 
     def _ensure_populated(self) -> None:
@@ -79,7 +87,7 @@ class CatalogProvider(SoundProvider):
                 return
         raise SoundProviderError(
             "Your sound catalog is empty. Scan your library first — click "
-            "'Scan library' in the CineSFX panel, or run: "
+            "'Sync library' in the CineSFX panel, or run: "
             "python -m scripts.run_cli --scan-library"
         )
 

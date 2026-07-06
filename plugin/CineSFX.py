@@ -226,8 +226,15 @@ def _build_window(ui, dispatcher):
                                 ),
                                 ui.Button(
                                     {
-                                        "ID": "ScanLibrary",
-                                        "Text": "Scan library",
+                                        "ID": "CheckLibrary",
+                                        "Text": "Check for changes",
+                                        "Weight": 0,
+                                    }
+                                ),
+                                ui.Button(
+                                    {
+                                        "ID": "SyncLibrary",
+                                        "Text": "Sync library",
                                         "Weight": 0,
                                     }
                                 ),
@@ -330,8 +337,12 @@ def _read_settings_from_ui(items) -> UserSettings:
     return settings
 
 
-def _scan_library(items, ui_call) -> None:
-    """Index the user's own sound library into the catalog (off the UI thread)."""
+def _sync_library(items, ui_call, dry_run: bool) -> None:
+    """Index or resync the user's own sound library (off the UI thread).
+
+    ``dry_run=True`` only *detects* changes on disk (nothing is written); False
+    applies them (adds new files, refreshes modified ones, prunes deleted ones).
+    """
     def status(text):
         ui_call(lambda: setattr(items["Status"], "Text", text))
 
@@ -348,20 +359,34 @@ def _scan_library(items, ui_call) -> None:
         config = load_config()  # persisted UI settings already overlaid
         settings = dict(config.raw.get("sound_providers", {}).get("catalog", {}))
         provider = CatalogProvider(settings, config.cache_dir())
-        status("Scanning your sound library…")
+        status("Checking your library for changes…" if dry_run else "Syncing your sound library…")
         try:
-            stats = provider.scan(progress=append)
+            stats = provider.scan(progress=append, dry_run=dry_run)
         except SoundProviderError as exc:
-            status("Nothing to scan.")
+            status("No library folders set.")
             append(f"{exc}")
             return
         append(stats.summary())
-        status(f"Catalog ready: {stats.total} sound(s) indexed.")
+        if dry_run:
+            if stats.in_sync:
+                status(f"Up to date — {stats.total} sound(s), no changes.")
+            else:
+                status(
+                    f"{stats.changed} change(s) on disk — click 'Sync library' "
+                    f"(+{stats.added} ~{stats.updated} -{stats.removed})."
+                )
+        elif stats.in_sync:
+            status(f"Already in sync — {stats.total} sound(s).")
+        else:
+            status(
+                f"Resynced: +{stats.added} ~{stats.updated} -{stats.removed} "
+                f"({stats.total} total)."
+            )
     except ConfigError as exc:
         status("Configuration error.")
         append(f"Configuration error: {exc}")
     except Exception as exc:  # noqa: BLE001 - show the error in the panel
-        status("Scan error — see output below.")
+        status("Sync error — see output below.")
         append(f"Error: {exc}\n{traceback.format_exc()}")
 
 
@@ -478,20 +503,29 @@ def main() -> None:
         items["Status"].Text = "Testing connection…"
         threading.Thread(target=_test_connection, daemon=True).start()
 
-    def on_scan(_event):
+    def _start_library(dry_run):
         # Persist the current choices (incl. catalog folders) before scanning.
         _read_settings_from_ui(items).save()
         items["Output"].PlainText = ""
-        items["Status"].Text = "Scanning library…"
+        items["Status"].Text = (
+            "Checking for changes…" if dry_run else "Syncing library…"
+        )
         threading.Thread(
-            target=_scan_library, args=(items, ui_call), daemon=True
+            target=_sync_library, args=(items, ui_call, dry_run), daemon=True
         ).start()
+
+    def on_check(_event):
+        _start_library(dry_run=True)
+
+    def on_sync(_event):
+        _start_library(dry_run=False)
 
     window.On[WINDOW_ID].Close = on_close
     window.On.ToggleLicense.Clicked = on_toggle_license
     window.On.Activate.Clicked = on_activate
     window.On.TestConn.Clicked = on_test
-    window.On.ScanLibrary.Clicked = on_scan
+    window.On.CheckLibrary.Clicked = on_check
+    window.On.SyncLibrary.Clicked = on_sync
     window.On.Preview.Clicked = on_preview
     window.On.Run.Clicked = on_run
 

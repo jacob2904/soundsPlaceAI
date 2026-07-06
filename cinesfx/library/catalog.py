@@ -86,12 +86,27 @@ class ScanStats:
     skipped: int = 0
     total: int = 0
     elapsed_seconds: float = 0.0
+    dry_run: bool = False
+
+    @property
+    def changed(self) -> int:
+        """Number of files added, updated, or removed by this pass."""
+        return self.added + self.updated + self.removed
+
+    @property
+    def in_sync(self) -> bool:
+        """True when the catalog already matched the folders (no changes)."""
+        return self.changed == 0
 
     def summary(self) -> str:
         """Return a compact, human-readable one-line summary."""
+        if self.in_sync:
+            verb = "would be in sync" if self.dry_run else "in sync"
+            return f"Library {verb} — {self.total} sound(s), no changes."
+        verb = "changes pending" if self.dry_run else "synced"
         return (
-            f"{self.total} sound(s) in catalog "
-            f"(+{self.added} new, ~{self.updated} updated, -{self.removed} removed, "
+            f"Library {verb}: +{self.added} new, ~{self.updated} updated, "
+            f"-{self.removed} removed ({self.total} total, "
             f"{self.skipped} unchanged) in {self.elapsed_seconds:.1f}s"
         )
 
@@ -189,8 +204,13 @@ class LibraryCatalog:
         probe_duration: bool = False,
         extensions: Optional[Iterable[str]] = None,
         progress: Optional[Callable[[str], None]] = None,
+        dry_run: bool = False,
     ) -> ScanStats:
-        """Index (or refresh) every audio file beneath ``roots``.
+        """Index or **resync** every audio file beneath ``roots``.
+
+        This is fully incremental, so calling it again after files change on disk
+        is a resync: new files are added, modified files are refreshed, and files
+        that were deleted are pruned.
 
         Args:
             roots: Folders to walk recursively. Missing folders are skipped.
@@ -198,14 +218,17 @@ class LibraryCatalog:
                 optional ``tinytag`` package; otherwise durations stay 0).
             extensions: Audio extensions to include (defaults to the common set).
             progress: Optional callback invoked with short status strings.
+            dry_run: When True, only *detect* what would change (added/updated/
+                removed) without writing the catalog — used to tell the user
+                whether a resync is needed.
 
         Returns:
-            A :class:`ScanStats` describing what changed.
+            A :class:`ScanStats` describing what changed (or would change).
         """
         started = time.monotonic()
         exts = {e.lower() for e in (extensions or _AUDIO_EXTENSIONS)}
         resolved_roots = self._resolve_roots(roots)
-        stats = ScanStats(roots=[str(r) for r in resolved_roots])
+        stats = ScanStats(roots=[str(r) for r in resolved_roots], dry_run=dry_run)
 
         if not resolved_roots:
             if progress:
@@ -236,19 +259,28 @@ class LibraryCatalog:
                 ):
                     stats.skipped += 1
                     continue
-                sounds[key] = self._entry_dict(path, stat, probe_duration)
+                # Skip the (slower) duration probe when only detecting changes.
+                sounds[key] = self._entry_dict(
+                    path, stat, probe_duration and not dry_run
+                )
                 stats.updated += 1 if prior else 0
                 stats.added += 0 if prior else 1
                 if progress and stats.scanned % 500 == 0:
                     progress(f"Indexed {stats.scanned} file(s)…")
 
         stats.removed = self._prune(sounds, resolved_roots, seen)
-        self._write_raw(sounds)
         stats.total = len(sounds)
 
-        self._cache = None  # invalidate the in-memory search cache
+        if not dry_run:
+            self._write_raw(sounds)
+            self._cache = None  # invalidate the in-memory search cache
+
         stats.elapsed_seconds = time.monotonic() - started
-        _log.info("Library scan complete: %s", stats.summary())
+        _log.info(
+            "Library %s complete: %s",
+            "change check" if dry_run else "scan",
+            stats.summary(),
+        )
         if progress:
             progress(stats.summary())
         return stats

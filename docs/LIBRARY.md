@@ -52,7 +52,7 @@ sound_providers:
 
 ## 2. Scan (catalog) your sounds
 
-**In the panel:** click **Scan library**. Progress appears in the output box and the
+**In the panel:** click **Sync library**. Progress appears in the output box and the
 catalog is saved for next time.
 
 **From the command line:**
@@ -74,8 +74,32 @@ python -m scripts.run_cli --library-stats
 Example output:
 
 ```
-1234 sound(s) in catalog (+1234 new, ~0 updated, -0 removed, 0 unchanged) in 3.8s
+Library synced: +1234 new, ~0 updated, -0 removed (1234 total, 0 unchanged) in 3.8s
 ```
+
+## Keeping it in sync (when your files change)
+
+Your catalog is **incremental**, so you never rebuild from scratch. Whenever you add,
+rename, move, or delete sounds on disk, just resync:
+
+- **In the panel:**
+  - **Check for changes** — a read-only peek that tells you what changed
+    (e.g. *"3 change(s) on disk — click 'Sync library' (+2 ~1 -0)"*) without
+    touching the catalog.
+  - **Sync library** — applies the changes: new files are added, modified files are
+    refreshed, and deleted files are removed. If nothing changed, it says
+    *"Already in sync."*
+- **From the command line:**
+
+```bash
+# Peek: report added/updated/removed without writing
+python -m scripts.run_cli --check-library
+
+# Resync: apply the changes (same command as the first scan — it's incremental)
+python -m scripts.run_cli --scan-library
+```
+
+Only changed files are touched, so resyncing even a huge library is fast.
 
 ## 3. Place from your library
 
@@ -114,7 +138,7 @@ never leaves your machine.
 
 ## Troubleshooting
 
-- **"Your sound catalog is empty."** — Run a scan first (panel **Scan library** or
+- **"Your sound catalog is empty."** — Run a scan first (panel **Sync library** or
   `--scan-library`).
 - **"No library folders configured."** — Add at least one folder to
   `sound_providers.catalog.roots` (or the panel field).

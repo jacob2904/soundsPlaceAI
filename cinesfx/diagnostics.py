@@ -213,7 +213,7 @@ def _check_catalog(config: AppConfig) -> CheckResult:
             "Sounds (catalog)",
             False,
             f"{len(roots)} folder(s) configured but not scanned yet — run "
-            f"'Scan library' (or --scan-library)",
+            f"'Sync library' (or --scan-library)",
         )
     return CheckResult(
         "Sounds (catalog)",

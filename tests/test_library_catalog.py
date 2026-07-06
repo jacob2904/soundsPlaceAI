@@ -79,6 +79,46 @@ def test_scan_prunes_deleted_files(tmp_path):
     assert catalog.count() == 2
 
 
+def test_dry_run_detects_changes_without_writing(tmp_path):
+    lib = tmp_path / "lib"
+    _make_library(lib)  # 3 audio files
+    catalog = LibraryCatalog(tmp_path / "catalog.json")
+    catalog.scan([lib])
+    assert catalog.count() == 3
+
+    # Change on disk: add one, modify one (size change), delete one.
+    (lib / "new_whoosh.wav").write_bytes(b"x")
+    (lib / "Doors" / "wooden_door_slam.wav").write_bytes(b"xxxx")
+    (lib / "Footsteps" / "Gravel" / "run_gravel_01.wav").unlink()
+
+    diff = catalog.scan([lib], dry_run=True)
+    assert diff.dry_run is True
+    assert diff.added == 1
+    assert diff.updated == 1
+    assert diff.removed == 1
+    assert diff.changed == 3
+    assert diff.in_sync is False
+    # Nothing was written — the catalog still reflects the original 3 files.
+    assert catalog.count() == 3
+
+    # Applying the resync writes the changes (+1 added, -1 removed => 3).
+    applied = catalog.scan([lib])
+    assert applied.in_sync is False
+    assert catalog.count() == 3
+
+
+def test_dry_run_reports_in_sync_when_unchanged(tmp_path):
+    lib = tmp_path / "lib"
+    _make_library(lib)
+    catalog = LibraryCatalog(tmp_path / "catalog.json")
+    catalog.scan([lib])
+
+    diff = catalog.scan([lib], dry_run=True)
+    assert diff.in_sync is True
+    assert diff.changed == 0
+    assert diff.skipped == 3
+
+
 def test_scan_multiple_roots(tmp_path):
     lib_a = tmp_path / "a"
     lib_b = tmp_path / "b"
@@ -149,6 +189,27 @@ def test_catalog_provider_search_and_download(tmp_path):
     assert results
     assert results[0].provider == "catalog"
     assert provider.download(results[0]).exists()
+
+
+def test_catalog_provider_resync_picks_up_changes(tmp_path):
+    lib = tmp_path / "lib"
+    _make_library(lib)
+    provider = CatalogProvider({"roots": [str(lib)]}, cache_dir=tmp_path / "cache")
+    provider.scan()
+    assert provider.catalog.count() == 3
+
+    (lib / "extra_boom.wav").write_bytes(b"x")
+
+    # Dry-run detects the change without writing.
+    diff = provider.scan(dry_run=True)
+    assert diff.added == 1
+    assert diff.in_sync is False
+    assert provider.catalog.count() == 3
+
+    # Real resync applies it and it becomes searchable.
+    provider.scan()
+    assert provider.catalog.count() == 4
+    assert provider.search("boom", SearchFilters(max_results=3))
 
 
 def test_catalog_provider_empty_errors(tmp_path):

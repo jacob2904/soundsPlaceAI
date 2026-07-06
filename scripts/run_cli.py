@@ -66,7 +66,12 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--scan-library",
         action="store_true",
-        help="Index your own sound library into the catalog and exit.",
+        help="Index/resync your own sound library into the catalog and exit.",
+    )
+    parser.add_argument(
+        "--check-library",
+        action="store_true",
+        help="Report changes on disk (added/updated/removed) without writing.",
     )
     parser.add_argument(
         "--library-roots",
@@ -118,8 +123,8 @@ def _handle_license_commands(args: argparse.Namespace) -> int | None:
 
 
 def _handle_library_commands(args: argparse.Namespace) -> int | None:
-    """Handle --scan-library / --library-stats. Returns exit code or None."""
-    if not (args.scan_library or args.library_stats):
+    """Handle library scan/resync/stats commands. Returns exit code or None."""
+    if not (args.scan_library or args.check_library or args.library_stats):
         return None
 
     from cinesfx.config import load_config
@@ -139,11 +144,11 @@ def _handle_library_commands(args: argparse.Namespace) -> int | None:
         settings["probe_duration"] = True
     provider = CatalogProvider(settings, config.cache_dir())
 
-    if args.scan_library:
+    if args.scan_library or args.check_library:
         try:
-            stats = provider.scan(progress=print)
+            stats = provider.scan(progress=print, dry_run=args.check_library)
         except SoundProviderError as exc:
-            print(f"Scan failed: {exc}")
+            print(f"{'Check' if args.check_library else 'Scan'} failed: {exc}")
             return 1
         print(stats.summary())
 

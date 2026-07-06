@@ -58,7 +58,7 @@ folder, category, searchable tokens, optional duration). Re-scanning is incremen
 files are touched, deleted files are pruned), so keeping a huge library current is
 cheap. Placement then searches that catalog and drops your own files onto the
 timeline — no uploads, no downloads, fully offline. Set
-`sound_providers.catalog.roots`, scan with the panel's **Scan library** button (or
+`sound_providers.catalog.roots`, scan with the panel's **Sync library** button (or
 `--scan-library`), and pick `catalog` as the provider. Implemented in
 `cinesfx/library/catalog.py` + `cinesfx/sound/catalog.py`. Full guide:
 [LIBRARY.md](LIBRARY.md).
