@@ -102,17 +102,40 @@ class AppConfig:
         return value
 
 
+def deep_merge(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
+    """Return ``base`` deep-merged with ``overrides`` (overrides win).
+
+    Nested dicts are merged recursively; scalar/list values are replaced. Neither
+    input is mutated.
+    """
+    result = dict(base)
+    for key, value in overrides.items():
+        existing = result.get(key)
+        if isinstance(existing, dict) and isinstance(value, dict):
+            result[key] = deep_merge(existing, value)
+        else:
+            result[key] = value
+    return result
+
+
 def load_config(
     config_path: Optional[str] = None,
     env_path: Optional[str] = None,
+    use_user_settings: bool = True,
 ) -> AppConfig:
-    """Load and validate configuration from YAML + environment.
+    """Load and validate configuration from YAML + user settings + environment.
+
+    Precedence (lowest to highest): ``config.yaml`` → persisted UI user settings
+    → this call's explicit arguments. This is what lets a user pick a brain /
+    sound provider once in the UI and have it remembered, while still being able
+    to change it again later.
 
     Args:
         config_path: Path to ``config.yaml``. Defaults to ``./config.yaml`` and
             falls back to ``config.example.yaml`` so the tool is runnable
             out-of-the-box for previews.
         env_path: Optional path to a ``.env`` file to load.
+        use_user_settings: When True, overlay the user's saved UI settings.
 
     Returns:
         A validated :class:`AppConfig`.
@@ -136,6 +159,9 @@ def load_config(
 
     if not isinstance(data, dict):
         raise ConfigError("Config root must be a mapping.")
+
+    if use_user_settings:
+        data = _overlay_user_settings(data)
 
     brain = str(data.get("brain", "gemini")).lower()
     if brain not in VALID_BRAINS:
@@ -161,3 +187,14 @@ def _resolve_config_file(config_path: Optional[str]) -> Path:
     if local.exists():
         return local
     return Path("config.example.yaml")
+
+
+def _overlay_user_settings(data: dict[str, Any]) -> dict[str, Any]:
+    """Deep-merge persisted UI settings over the YAML config, if available."""
+    try:
+        from cinesfx.settings import UserSettings
+
+        overrides = UserSettings.load().as_override_dict()
+    except Exception:  # noqa: BLE001 - settings are optional; never block load
+        return data
+    return deep_merge(data, overrides) if overrides else data
