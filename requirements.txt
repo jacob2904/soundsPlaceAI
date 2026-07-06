@@ -13,6 +13,9 @@ python-dotenv>=1.0.0
 httpx>=0.27.0
 requests>=2.31.0
 
+# Offline license verification (Ed25519 signatures)
+cryptography>=41.0.0
+
 # Optional "brain" SDKs. These are imported lazily; install only the one you use.
 # google-generativeai>=0.7.0
 # openai>=1.30.0
