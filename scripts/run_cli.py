@@ -46,7 +46,17 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Plan and print SFX without modifying the timeline.",
+        help="Plan and print SFX without modifying the timeline (free preview).",
+    )
+    parser.add_argument(
+        "--activate",
+        metavar="LICENSE_KEY",
+        help="Activate a one-time lifetime license key and exit.",
+    )
+    parser.add_argument(
+        "--license-status",
+        action="store_true",
+        help="Show the current license status and exit.",
     )
     parser.add_argument("--config", help="Path to config.yaml.")
     parser.add_argument("--env", help="Path to a .env file.")
@@ -61,10 +71,34 @@ def _mode_and_color(args: argparse.Namespace) -> tuple[str, str | None]:
     return SELECT_CURRENT, None
 
 
+def _handle_license_commands(args: argparse.Namespace) -> int | None:
+    """Handle --activate / --license-status. Returns exit code or None."""
+    from cinesfx.licensing import LicenseError
+    from cinesfx.settings import activate_license, get_license_status
+
+    if args.activate:
+        try:
+            status = activate_license(args.activate)
+        except LicenseError as exc:
+            print(f"Activation failed: {exc}")
+            return 1
+        print(status.message)
+        return 0
+
+    if args.license_status:
+        print(get_license_status().message)
+        return 0
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code."""
     args = _parse_args(argv if argv is not None else sys.argv[1:])
     configure_logging()
+
+    license_result = _handle_license_commands(args)
+    if license_result is not None:
+        return license_result
 
     try:
         orchestrator = build_orchestrator(config_path=args.config, env_path=args.env)
@@ -74,7 +108,9 @@ def main(argv: list[str] | None = None) -> int:
 
     mode, color = _mode_and_color(args)
     try:
-        results = orchestrator.run(mode=mode, color=color, dry_run=args.dry_run)
+        results = orchestrator.run(
+            mode=mode, color=color, dry_run=args.dry_run, progress=_log.info
+        )
     except Exception as exc:  # noqa: BLE001 - present a clean message to the user
         _log.error("Run failed: %s", exc)
         return 1

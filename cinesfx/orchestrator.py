@@ -11,7 +11,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from cinesfx.analysis import SceneAgent
 from cinesfx.brain import BrainProvider, create_brain
@@ -66,6 +66,9 @@ class Orchestrator:
 
         self._cache_dir: Path = config.cache_dir()
         self._max_workers = max(1, int(runtime.get("max_workers", 4)))
+        # How many scenes are described per brain call. Keeping this bounded is
+        # what makes long clips (hundreds of shots) practical and affordable.
+        self._scenes_per_batch = max(1, int(runtime.get("scenes_per_brain_batch", 12)))
 
         self._timeline = timeline_agent
         self._brain = brain
@@ -80,6 +83,7 @@ class Orchestrator:
         mode: str = "current",
         color: Optional[str] = None,
         dry_run: bool = False,
+        progress: Optional[Callable[[str], None]] = None,
     ) -> list[ClipResult]:
         """Analyse the selection and (unless ``dry_run``) place the SFX.
 
@@ -87,24 +91,41 @@ class Orchestrator:
             mode: Selection mode passed to the TimelineAgent.
             color: Clip color for ``mode == 'color'``.
             dry_run: If True, build and report the plan but do not edit Resolve.
+            progress: Optional callback invoked with human-readable status
+                strings (used by the UI to show live progress).
 
         Returns:
             A list of :class:`ClipResult`, one per selected clip.
+
+        Raises:
+            LicenseError: If a non-dry-run is attempted without a valid license.
         """
+        report = progress or (lambda _message: None)
+
+        # Preview (dry-run) is always free; placing SFX requires activation.
+        if not dry_run:
+            self._require_license()
+
         timeline = self._require_timeline()
+        report("Reading timeline selection…")
         clips = timeline.read_selection(mode=mode, color=color)
         if not clips:
             _log.warning("No clips matched the selection (mode=%s).", mode)
+            report("No matching clips found.")
             return []
 
-        results = self._process_clips_concurrently(clips)
+        report(f"Analysing {len(clips)} clip(s)…")
+        results = self._process_clips_concurrently(clips, report)
 
         if dry_run:
             _log.info("Dry-run: %d clip(s) planned; no timeline changes made.",
                       len(results))
+            report("Preview ready (no changes made).")
             return results
 
+        report("Placing sound effects on the timeline…")
         self._apply(timeline, results)
+        report("Done.")
         return results
 
     def report(self, results: list[ClipResult]) -> str:
@@ -138,10 +159,11 @@ class Orchestrator:
     # ------------------------------------------------------------------ pipeline
 
     def _process_clips_concurrently(
-        self, clips: list[ClipSelection]
+        self, clips: list[ClipSelection], report: Callable[[str], None]
     ) -> list[ClipResult]:
         """Run the analyse+plan stage for every clip across a thread pool."""
         results: list[ClipResult] = []
+        done = 0
         with ThreadPoolExecutor(max_workers=self._max_workers) as pool:
             futures = {
                 pool.submit(self._process_single_clip, clip): clip for clip in clips
@@ -153,6 +175,8 @@ class Orchestrator:
                 except Exception as exc:  # noqa: BLE001 - capture per-clip failure
                     _log.warning("Clip '%s' failed: %s", clip.name, exc)
                     results.append(ClipResult(clip=clip, error=str(exc)))
+                done += 1
+                report(f"Analysed {done}/{len(clips)} clip(s)…")
         # Preserve timeline order for a readable report.
         results.sort(key=lambda item: item.clip.timeline_start_frame)
         return results
@@ -160,12 +184,35 @@ class Orchestrator:
     def _process_single_clip(self, clip: ClipSelection) -> ClipResult:
         """Full analyse+plan for one clip (safe to run in a worker thread)."""
         scenes = self._scene_agent.analyze(clip)
-        cues = self._require_brain().describe_and_plan(
-            scenes, self._brain_context(clip)
-        )
+        cues = self._plan_cues_batched(clip, scenes)
         resolved = self._resolve_cues(clip, cues)
         plan = self._placement_agent.plan_for_clip(clip, scenes, resolved)
         return ClipResult(clip=clip, scenes=scenes, plan=plan)
+
+    def _plan_cues_batched(
+        self, clip: ClipSelection, scenes: list[Scene]
+    ) -> list[SfxCue]:
+        """Ask the brain to plan cues, batching scenes for long clips.
+
+        Splitting a long clip's scenes into small batches keeps each LLM request
+        cheap and within context limits, while still covering the whole video.
+        Cues keep their real ``scene_index`` so placement maps them correctly.
+        """
+        brain = self._require_brain()
+        context = self._brain_context(clip)
+        cues: list[SfxCue] = []
+        for start in range(0, len(scenes), self._scenes_per_batch):
+            batch = scenes[start : start + self._scenes_per_batch]
+            try:
+                cues.extend(brain.describe_and_plan(batch, context))
+            except Exception as exc:  # noqa: BLE001 - one batch must not kill the clip
+                _log.warning(
+                    "Brain batch %d for '%s' failed: %s",
+                    start // self._scenes_per_batch,
+                    clip.name,
+                    exc,
+                )
+        return cues
 
     def _resolve_cues(
         self, clip: ClipSelection, cues: list[SfxCue]
@@ -219,6 +266,27 @@ class Orchestrator:
         if cue.duration_seconds > 0:
             return cue.duration_seconds * 2.0
         return 12.0
+
+    @staticmethod
+    def _require_license() -> None:
+        """Ensure a valid license is active before writing to the timeline.
+
+        Previewing (dry-run) is always free; placing SFX is the paid action.
+
+        Raises:
+            LicenseError: If no valid license is activated.
+        """
+        from cinesfx.licensing import LicenseError
+        from cinesfx.settings import get_license_status
+
+        status = get_license_status()
+        if not status.activated:
+            raise LicenseError(
+                "Placing sound effects requires an activated CineSFX license "
+                "(one-time purchase, lifetime). " + status.message + " You can "
+                "still use Preview (dry-run) for free. Activate your key in the "
+                "panel or with: python -m scripts.run_cli --activate <KEY>"
+            )
 
     def _require_timeline(self) -> TimelineAgent:
         if self._timeline is None:

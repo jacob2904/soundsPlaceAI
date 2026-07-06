@@ -39,6 +39,14 @@ class SceneAgent:
         self._frames_per_scene = max(1, int(config.get("frames_per_scene", 2)))
         self._keyframe_width = int(config.get("keyframe_width", 512))
         self._min_scene_seconds = float(config.get("min_scene_seconds", 0.4))
+        # Long-clip controls: keep whole-video coverage bounded and fast.
+        self._max_scenes = int(config.get("max_scenes", 400))
+        self._long_clip_threshold = float(
+            config.get("long_clip_threshold_seconds", 600.0)
+        )
+        # frame_skip < 0 means "decide automatically from clip length".
+        self._frame_skip = int(config.get("frame_skip", -1))
+        self._target_eval_fps = float(config.get("target_eval_fps", 4.0))
         self._cache_dir = cache_dir / "keyframes"
         self._cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -62,10 +70,38 @@ class SceneAgent:
             return cached
 
         boundaries = self._detect_boundaries(clip)
+        boundaries = self._bound_scene_count(boundaries)
         scenes = self._build_scenes(clip, boundaries, cache_key)
         self._save_cache(cache_key, scenes)
         _log.info("Analysed %s into %d scene(s)", clip.name, len(scenes))
         return scenes
+
+    def _bound_scene_count(
+        self, boundaries: list[tuple[float, float]]
+    ) -> list[tuple[float, float]]:
+        """Cap the number of scenes by merging adjacent shots evenly.
+
+        On a long video with hundreds of cuts we still want full coverage, but we
+        must keep the key-frame + brain workload bounded. If there are more shots
+        than ``max_scenes``, consecutive shots are grouped into ``max_scenes``
+        evenly-sized "super-scenes" that together still span the whole clip.
+        """
+        count = len(boundaries)
+        if count <= self._max_scenes:
+            return boundaries
+
+        _log.info(
+            "Merging %d shots into %d scenes for efficient coverage.",
+            count,
+            self._max_scenes,
+        )
+        merged: list[tuple[float, float]] = []
+        for bucket in range(self._max_scenes):
+            start_idx = bucket * count // self._max_scenes
+            end_idx = ((bucket + 1) * count // self._max_scenes) - 1
+            end_idx = max(start_idx, min(end_idx, count - 1))
+            merged.append((boundaries[start_idx][0], boundaries[end_idx][1]))
+        return merged
 
     # ------------------------------------------------------------------ detection
 
@@ -82,11 +118,16 @@ class SceneAgent:
     def _detect_with_scenedetect(
         self, clip: ClipSelection
     ) -> list[tuple[float, float]]:
-        """Run PySceneDetect over only the clip's range, on down-scaled frames."""
+        """Run PySceneDetect over only the clip's range, on down-scaled frames.
+
+        For long clips this applies frame-skipping and down-scaling so detection
+        stays fast (seconds, not minutes) while still finding real cuts.
+        """
         from scenedetect import AdaptiveDetector, ContentDetector, SceneManager, open_video
 
         video = open_video(clip.source_path)
         scene_manager = SceneManager()
+        self._apply_downscale(scene_manager)
         detector = (
             AdaptiveDetector()
             if self._detector == "adaptive"
@@ -98,11 +139,14 @@ class SceneAgent:
         base_rate = video.frame_rate or clip.fps
         start_tc = clip.source_start_seconds
         end_tc = clip.source_end_seconds
+        duration = max(0.0, end_tc - start_tc)
+        frame_skip = self._resolve_frame_skip(duration, base_rate)
         video.seek(start_tc)
         scene_manager.detect_scenes(
             video=video,
-            duration=self._as_timecode(base_rate, end_tc - start_tc),
-            frame_skip=0,
+            duration=self._as_timecode(base_rate, duration),
+            frame_skip=frame_skip,
+            show_progress=False,
         )
         raw = scene_manager.get_scene_list()
 
@@ -123,6 +167,33 @@ class SceneAgent:
         from scenedetect import FrameTimecode
 
         return FrameTimecode(max(0.0, seconds), fps=frame_rate)
+
+    def _apply_downscale(self, scene_manager: Any) -> None:
+        """Configure detection down-scaling on the SceneManager, if supported."""
+        try:
+            if self._downscale and self._downscale > 1:
+                scene_manager.auto_downscale = False
+                scene_manager.downscale = self._downscale
+            else:
+                scene_manager.auto_downscale = True
+        except (AttributeError, ValueError) as exc:
+            _log.debug("Could not set downscale on SceneManager: %s", exc)
+
+    def _resolve_frame_skip(self, duration_seconds: float, fps: float) -> int:
+        """Return the frame-skip to use for detection.
+
+        Uses the configured value when >= 0; otherwise auto-selects based on clip
+        length: short clips are analysed frame-accurately (skip 0), while long
+        clips evaluate ~``target_eval_fps`` frames per second for speed.
+        """
+        if self._frame_skip >= 0:
+            return self._frame_skip
+        if duration_seconds < self._long_clip_threshold or fps <= 0:
+            return 0
+        if self._target_eval_fps <= 0:
+            return 0
+        skip = int(round(fps / self._target_eval_fps)) - 1
+        return max(0, skip)
 
     def _uniform_boundaries(self, clip: ClipSelection) -> list[tuple[float, float]]:
         """Fallback: split the clip into fixed-length windows."""
@@ -212,6 +283,7 @@ class SceneAgent:
             f"{identity}|{clip.source_start_seconds:.3f}|{clip.source_end_seconds:.3f}"
             f"|{self._detector}|{self._threshold}|{self._downscale}"
             f"|{self._frames_per_scene}|{self._keyframe_width}"
+            f"|{self._max_scenes}|{self._frame_skip}|{self._target_eval_fps}"
         )
         return hashlib.sha1(params.encode("utf-8")).hexdigest()[:16]
 

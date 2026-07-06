@@ -50,6 +50,11 @@ analysis:
   frames_per_scene: 2                 # key-frames sent to the brain per shot
   keyframe_width: 512                 # px; downscaled frames keep uploads tiny
   min_scene_seconds: 0.4              # ignore ultra-short flashes
+  # ---- Long-clip handling (keeps hour-long videos fast & bounded) ----
+  max_scenes: 400                     # cap: extra shots are merged, keeping full coverage
+  long_clip_threshold_seconds: 600    # clips longer than this use frame-skipping
+  frame_skip: -1                      # -1 = auto (skip frames on long clips); 0 = frame-accurate
+  target_eval_fps: 4.0                # on long clips, evaluate ~this many frames/sec
 
 # How sounds are placed on the timeline.
 placement:
@@ -69,5 +74,6 @@ spatial:
 # Runtime behaviour.
 runtime:
   max_workers: 4                      # clips analysed in parallel
+  scenes_per_brain_batch: 12          # scenes per LLM call (keeps long clips cheap)
   cache_dir: ~/.cache/cinesfx
   log_level: INFO
