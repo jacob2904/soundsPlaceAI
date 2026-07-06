@@ -53,8 +53,8 @@ cinematic SFX library, but its one-shots and FX are useful for design.
 
 ### Catalog (your own library) — ✅ works for SFX, offline
 Point CineSFX at one or more folders on your computer and it indexes **every**
-audio file into a small, persistent SQLite catalog (name, folder, category,
-searchable tokens, optional duration). Re-scanning is incremental (only changed
+audio file into a small, persistent **JSON catalog file** — no database (name,
+folder, category, searchable tokens, optional duration). Re-scanning is incremental (only changed
 files are touched, deleted files are pruned), so keeping a huge library current is
 cheap. Placement then searches that catalog and drops your own files onto the
 timeline — no uploads, no downloads, fully offline. Set

@@ -149,7 +149,7 @@ def _handle_library_commands(args: argparse.Namespace) -> int | None:
 
     if args.library_stats:
         info = provider.catalog.stats()
-        print(f"Catalog: {info['total']} sound(s) at {info['db_path']}")
+        print(f"Catalog: {info['total']} sound(s) at {info['path']}")
         for category, count in info["by_category"].items():
             print(f"  {category:>14}: {count}")
     return 0

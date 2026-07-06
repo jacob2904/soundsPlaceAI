@@ -6,15 +6,15 @@ and the AI will drop your own files onto the Resolve timeline in sync with the
 picture.
 
 This is the `catalog` sound provider. It is fully offline: nothing is uploaded and
-nothing is downloaded — your files are already on disk.
+nothing is downloaded — your files are already on disk. There's **no database** —
+the catalog is a single, plain **JSON file** you can open, inspect, or delete.
 
 ## How it works
 
 1. **Scan** — CineSFX walks the folders you choose and records each audio file in a
-   small [SQLite](https://sqlite.org) catalog: file name, folder, extension, size,
-   modified-time, an inferred category (footsteps, door, water, impact, …), and a
-   set of searchable tokens taken from the file and folder names. Durations are
-   optional (see below).
+   small **JSON catalog file**: file name, folder, extension, size, modified-time,
+   an inferred category (footsteps, door, water, impact, …), and a set of searchable
+   tokens taken from the file and folder names. Durations are optional (see below).
 2. **Match** — When the brain asks for, say, *"wooden door creaks open"*, CineSFX
    searches the catalog by token overlap on those names and returns your best files.
 3. **Place** — The chosen file is inserted on the CineSFX audio track at the right
@@ -45,7 +45,7 @@ sound_providers:
     roots:
       - ~/SFX
       - ~/Music/Sound Effects
-    # db_path: ~/.cache/cinesfx/library.db   # optional; defaults inside cache_dir
+    # catalog_path: ~/.cache/cinesfx/library.json  # optional; defaults inside cache_dir
     probe_duration: false                    # true = read durations (needs 'tinytag')
     auto_scan: false                         # true = auto-index on first use if empty
 ```
@@ -106,9 +106,10 @@ python -m scripts.run_cli --scan-library --probe-duration
 
 ## Where the catalog lives
 
-A single file, by default `~/.cache/cinesfx/library.db` (override with
-`sound_providers.catalog.db_path`). It's safe to delete at any time — just re-scan.
-The catalog stores only file **paths and metadata**, never the audio itself, and it
+A single JSON file, by default `~/.cache/cinesfx/library.json` (override with
+`sound_providers.catalog.catalog_path`). No database is created. It's plain text —
+open it if you're curious — and safe to delete at any time (just re-scan). The
+catalog stores only file **paths and metadata**, never the audio itself, and it
 never leaves your machine.
 
 ## Troubleshooting

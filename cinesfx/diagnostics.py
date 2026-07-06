@@ -187,24 +187,26 @@ def check_sound(config: AppConfig) -> CheckResult:
 
 
 def _check_catalog(config: AppConfig) -> CheckResult:
-    """Check the user's sound catalog: DB populated and/or roots configured."""
-    from cinesfx.library.catalog import LibraryCatalog, default_db_path
+    """Check the user's sound catalog: file populated and/or roots configured."""
+    from cinesfx.library.catalog import LibraryCatalog, default_catalog_path
     from cinesfx.sound.catalog import resolve_catalog_roots
 
     settings = config.sound_settings()
     roots = resolve_catalog_roots(settings)
-    db_setting = settings.get("db_path")
-    db_path = (
-        Path(db_setting).expanduser() if db_setting else default_db_path(config.cache_dir())
+    path_setting = settings.get("catalog_path")
+    catalog_path = (
+        Path(path_setting).expanduser()
+        if path_setting
+        else default_catalog_path(config.cache_dir())
     )
     try:
-        count = LibraryCatalog(db_path).count() if db_path.exists() else 0
+        count = LibraryCatalog(catalog_path).count() if catalog_path.exists() else 0
     except Exception as exc:  # noqa: BLE001 - report, never raise
         return CheckResult("Sounds (catalog)", False, f"catalog error: {exc}")
 
     if count > 0:
         return CheckResult(
-            "Sounds (catalog)", True, f"{count} sound(s) indexed at {db_path}"
+            "Sounds (catalog)", True, f"{count} sound(s) indexed at {catalog_path}"
         )
     if roots:
         return CheckResult(

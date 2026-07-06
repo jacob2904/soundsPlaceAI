@@ -9,12 +9,12 @@ from cinesfx.library.catalog import (
     LibraryCatalog,
     LibraryEntry,
     ScanStats,
-    default_db_path,
+    default_catalog_path,
 )
 
 __all__ = [
     "LibraryCatalog",
     "LibraryEntry",
     "ScanStats",
-    "default_db_path",
+    "default_catalog_path",
 ]

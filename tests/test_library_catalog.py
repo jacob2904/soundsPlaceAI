@@ -23,7 +23,7 @@ def _make_library(root):
 def test_scan_indexes_only_audio(tmp_path):
     lib = tmp_path / "lib"
     _make_library(lib)
-    catalog = LibraryCatalog(tmp_path / "cat.db")
+    catalog = LibraryCatalog(tmp_path / "catalog.json")
 
     stats = catalog.scan([lib])
     assert stats.added == 3
@@ -34,7 +34,7 @@ def test_scan_indexes_only_audio(tmp_path):
 def test_search_matches_by_name_and_folder(tmp_path):
     lib = tmp_path / "lib"
     _make_library(lib)
-    catalog = LibraryCatalog(tmp_path / "cat.db")
+    catalog = LibraryCatalog(tmp_path / "catalog.json")
     catalog.scan([lib])
 
     results = catalog.search("wooden door creaks open", limit=5)
@@ -48,7 +48,7 @@ def test_search_matches_by_name_and_folder(tmp_path):
 def test_search_empty_query_returns_nothing(tmp_path):
     lib = tmp_path / "lib"
     _make_library(lib)
-    catalog = LibraryCatalog(tmp_path / "cat.db")
+    catalog = LibraryCatalog(tmp_path / "catalog.json")
     catalog.scan([lib])
     assert catalog.search("   ", limit=5) == []
 
@@ -56,7 +56,7 @@ def test_search_empty_query_returns_nothing(tmp_path):
 def test_scan_is_incremental(tmp_path):
     lib = tmp_path / "lib"
     _make_library(lib)
-    catalog = LibraryCatalog(tmp_path / "cat.db")
+    catalog = LibraryCatalog(tmp_path / "catalog.json")
     catalog.scan([lib])
 
     # Re-scan with no changes: everything is skipped, nothing added.
@@ -70,7 +70,7 @@ def test_scan_is_incremental(tmp_path):
 def test_scan_prunes_deleted_files(tmp_path):
     lib = tmp_path / "lib"
     _make_library(lib)
-    catalog = LibraryCatalog(tmp_path / "cat.db")
+    catalog = LibraryCatalog(tmp_path / "catalog.json")
     catalog.scan([lib])
 
     (lib / "Doors" / "wooden_door_slam.wav").unlink()
@@ -86,7 +86,7 @@ def test_scan_multiple_roots(tmp_path):
     lib_b.mkdir()
     (lib_a / "thunder.wav").write_bytes(b"x")
     (lib_b / "rain.wav").write_bytes(b"x")
-    catalog = LibraryCatalog(tmp_path / "cat.db")
+    catalog = LibraryCatalog(tmp_path / "catalog.json")
 
     stats = catalog.scan([lib_a, lib_b])
     assert stats.total == 2
@@ -101,7 +101,7 @@ def test_scanning_one_root_does_not_prune_another(tmp_path):
     lib_b.mkdir()
     (lib_a / "one.wav").write_bytes(b"x")
     (lib_b / "two.wav").write_bytes(b"x")
-    catalog = LibraryCatalog(tmp_path / "cat.db")
+    catalog = LibraryCatalog(tmp_path / "catalog.json")
     catalog.scan([lib_a, lib_b])
 
     # Re-scanning only root A must not delete B's entries.
@@ -112,7 +112,7 @@ def test_scanning_one_root_does_not_prune_another(tmp_path):
 def test_stats_report_categories(tmp_path):
     lib = tmp_path / "lib"
     _make_library(lib)
-    catalog = LibraryCatalog(tmp_path / "cat.db")
+    catalog = LibraryCatalog(tmp_path / "catalog.json")
     catalog.scan([lib])
     info = catalog.stats()
     assert info["total"] == 3
@@ -122,7 +122,7 @@ def test_stats_report_categories(tmp_path):
 def test_clear_empties_catalog(tmp_path):
     lib = tmp_path / "lib"
     _make_library(lib)
-    catalog = LibraryCatalog(tmp_path / "cat.db")
+    catalog = LibraryCatalog(tmp_path / "catalog.json")
     catalog.scan([lib])
     catalog.clear()
     assert catalog.count() == 0

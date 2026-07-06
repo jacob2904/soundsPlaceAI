@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Optional
 
-from cinesfx.library.catalog import LibraryCatalog, default_db_path
+from cinesfx.library.catalog import LibraryCatalog, default_catalog_path
 from cinesfx.logging_utils import get_logger
 from cinesfx.models import SoundAsset
 from cinesfx.sound.base import SearchFilters, SoundProvider, SoundProviderError
@@ -40,9 +40,13 @@ class CatalogProvider(SoundProvider):
 
     def __init__(self, settings: dict[str, Any], cache_dir: Path) -> None:
         super().__init__(settings, cache_dir)
-        db_setting = settings.get("db_path")
-        db_path = Path(db_setting).expanduser() if db_setting else default_db_path(cache_dir)
-        self._catalog = LibraryCatalog(db_path)
+        path_setting = settings.get("catalog_path")
+        catalog_path = (
+            Path(path_setting).expanduser()
+            if path_setting
+            else default_catalog_path(cache_dir)
+        )
+        self._catalog = LibraryCatalog(catalog_path)
         self._roots = _roots_from_settings(settings)
         self._auto_scan = bool(settings.get("auto_scan", False))
         self._probe_duration = bool(settings.get("probe_duration", False))

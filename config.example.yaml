@@ -45,7 +45,7 @@ sound_providers:
     roots:                            # one or more folders to scan (recursively)
       - ~/SFX
       - ~/Music/Sound Effects
-    # db_path: ~/.cache/cinesfx/library.db  # optional; defaults inside cache_dir
+    # catalog_path: ~/.cache/cinesfx/library.json  # optional; defaults inside cache_dir
     probe_duration: false             # true = read durations too (needs 'tinytag')
     auto_scan: false                  # true = auto-index on first use if empty
   audiio:                             # ✗ no public API — enterprise/bespoke only

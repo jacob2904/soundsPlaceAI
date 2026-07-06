@@ -3,36 +3,36 @@
 This is the "index all my sounds" engine. Point it at one or more folders on the
 user's computer and it walks them for audio files, extracts light metadata
 (name, folder, extension, size, modified-time, optional duration, an inferred
-category, and searchable tokens) and stores everything in a small SQLite
-database. Re-scanning is **incremental**: unchanged files are skipped, changed
-files are refreshed, and files that were deleted on disk are pruned — so keeping
-a large library up to date is cheap.
+category, and searchable tokens) and stores everything in a single, plain
+**JSON file** — no database. The file is human-readable, portable across
+Windows/macOS/Linux, safe to delete (just re-scan), and needs nothing beyond
+Python's standard library.
+
+Re-scanning is **incremental**: unchanged files are skipped, changed files are
+refreshed, and files that were deleted on disk are pruned — so keeping a large
+library up to date is cheap.
 
 Searching ranks catalog entries against a text query by fast token overlap on
 file and folder names (the same matching the ``local`` provider uses), so the AI
 brain's abstract cue (e.g. "wooden door creaks open") maps onto the user's real
 files. The whole catalog is loaded into memory once per process and cached, so
 the many per-cue searches a run performs stay fast even for large libraries.
-
-The database is intentionally a single self-contained file: portable across
-Windows/macOS/Linux, safe to delete (just re-scan), and dependency-free beyond
-Python's standard-library ``sqlite3``.
 """
 
 from __future__ import annotations
 
-import sqlite3
+import json
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Iterable, Optional
+from typing import Any, Callable, Iterable, Optional
 
 from cinesfx.logging_utils import get_logger
 from cinesfx.sound.local import _AUDIO_EXTENSIONS, tokenize
 
 _log = get_logger("library.catalog")
 
-_SCHEMA_VERSION = 1
+_CATALOG_VERSION = 1
 
 # Folder/filename keyword → category. First match wins. Purely a convenience for
 # filtering/reporting; matching itself is token-based and category-agnostic.
@@ -59,7 +59,7 @@ _FOLDER_TOKEN_DEPTH = 4
 
 @dataclass
 class LibraryEntry:
-    """One cataloged sound file (a row in the catalog)."""
+    """One cataloged sound file."""
 
     path: str
     stem: str
@@ -96,9 +96,9 @@ class ScanStats:
         )
 
 
-def default_db_path(cache_dir: Path) -> Path:
-    """Return the default catalog database path inside ``cache_dir``."""
-    return cache_dir / "library.db"
+def default_catalog_path(cache_dir: Path) -> Path:
+    """Return the default catalog JSON file path inside ``cache_dir``."""
+    return cache_dir / "library.json"
 
 
 def infer_category(tokens: Iterable[str]) -> str:
@@ -138,48 +138,47 @@ def _probe_duration(path: Path) -> float:
 
 
 class LibraryCatalog:
-    """A SQLite-backed, incremental catalog of local audio files."""
+    """A JSON-file-backed, incremental catalog of local audio files.
 
-    def __init__(self, db_path: Path) -> None:
-        self._db_path = Path(db_path).expanduser()
-        self._db_path.parent.mkdir(parents=True, exist_ok=True)
+    The on-disk format is a single JSON object::
+
+        {"version": 1, "sounds": {"<abs path>": {stem, folder, ext, size,
+                                                  mtime, duration, category, tags}}}
+
+    Keying by absolute path makes incremental re-scans a simple dict update.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self._path = Path(path).expanduser()
+        self._path.parent.mkdir(parents=True, exist_ok=True)
         self._cache: Optional[list[LibraryEntry]] = None
-        self._init_db()
 
     @property
-    def db_path(self) -> Path:
-        return self._db_path
+    def catalog_path(self) -> Path:
+        return self._path
 
-    # ------------------------------------------------------------------ database
+    # ------------------------------------------------------------------ file I/O
 
-    def _connect(self) -> sqlite3.Connection:
-        # A fresh connection per operation keeps the catalog thread-safe: the UI
-        # scans on a worker thread while the pipeline searches on its own pool.
-        conn = sqlite3.connect(str(self._db_path))
-        conn.row_factory = sqlite3.Row
-        return conn
+    def _read_raw(self) -> dict[str, dict[str, Any]]:
+        """Return the ``sounds`` mapping from disk (``{}`` if missing/invalid)."""
+        if not self._path.exists():
+            return {}
+        try:
+            with open(self._path, "r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        except (OSError, json.JSONDecodeError) as exc:
+            _log.warning("Could not read catalog %s: %s", self._path, exc)
+            return {}
+        sounds = data.get("sounds") if isinstance(data, dict) else None
+        return sounds if isinstance(sounds, dict) else {}
 
-    def _init_db(self) -> None:
-        with self._connect() as conn:
-            conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS sounds (
-                    path      TEXT PRIMARY KEY,
-                    filename  TEXT NOT NULL,
-                    stem      TEXT NOT NULL,
-                    folder    TEXT NOT NULL,
-                    ext       TEXT NOT NULL,
-                    size      INTEGER NOT NULL,
-                    mtime     REAL NOT NULL,
-                    duration  REAL NOT NULL DEFAULT 0,
-                    category  TEXT NOT NULL DEFAULT '',
-                    tags      TEXT NOT NULL DEFAULT ''
-                )
-                """
-            )
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_category ON sounds(category)")
-            conn.commit()
+    def _write_raw(self, sounds: dict[str, dict[str, Any]]) -> None:
+        """Atomically write the ``sounds`` mapping to disk (compact JSON)."""
+        payload = {"version": _CATALOG_VERSION, "sounds": sounds}
+        tmp = self._path.with_suffix(self._path.suffix + ".tmp")
+        with open(tmp, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, separators=(",", ":"))
+        tmp.replace(self._path)
 
     # ---------------------------------------------------------------------- scan
 
@@ -215,42 +214,37 @@ class LibraryCatalog:
             stats.elapsed_seconds = time.monotonic() - started
             return stats
 
-        with self._connect() as conn:
-            existing = {
-                row["path"]: (row["mtime"], row["size"])
-                for row in conn.execute("SELECT path, mtime, size FROM sounds")
-            }
-            seen: set[str] = set()
-            pending: list[tuple] = []
+        sounds = self._read_raw()
+        seen: set[str] = set()
 
-            for root in resolved_roots:
-                if progress:
-                    progress(f"Scanning {root}…")
-                for path in self._walk_audio(root, exts):
-                    key = str(path)
-                    seen.add(key)
-                    stats.scanned += 1
-                    try:
-                        stat = path.stat()
-                    except OSError:
-                        continue
-                    prior = existing.get(key)
-                    if prior and prior[0] == stat.st_mtime and prior[1] == stat.st_size:
-                        stats.skipped += 1
-                        continue
-                    pending.append(self._row_for(path, stat, probe_duration))
-                    stats.updated += 1 if prior else 0
-                    stats.added += 0 if prior else 1
-                    if len(pending) >= 500:
-                        self._flush(conn, pending)
-                        pending.clear()
-                        if progress:
-                            progress(f"Indexed {stats.scanned} file(s)…")
+        for root in resolved_roots:
+            if progress:
+                progress(f"Scanning {root}…")
+            for path in self._walk_audio(root, exts):
+                key = str(path)
+                seen.add(key)
+                stats.scanned += 1
+                try:
+                    stat = path.stat()
+                except OSError:
+                    continue
+                prior = sounds.get(key)
+                if (
+                    prior
+                    and prior.get("mtime") == stat.st_mtime
+                    and prior.get("size") == stat.st_size
+                ):
+                    stats.skipped += 1
+                    continue
+                sounds[key] = self._entry_dict(path, stat, probe_duration)
+                stats.updated += 1 if prior else 0
+                stats.added += 0 if prior else 1
+                if progress and stats.scanned % 500 == 0:
+                    progress(f"Indexed {stats.scanned} file(s)…")
 
-            self._flush(conn, pending)
-            stats.removed = self._prune(conn, resolved_roots, seen)
-            conn.commit()
-            stats.total = conn.execute("SELECT COUNT(*) FROM sounds").fetchone()[0]
+        stats.removed = self._prune(sounds, resolved_roots, seen)
+        self._write_raw(sounds)
+        stats.total = len(sounds)
 
         self._cache = None  # invalidate the in-memory search cache
         stats.elapsed_seconds = time.monotonic() - started
@@ -282,55 +276,37 @@ class LibraryCatalog:
                 continue
 
     @staticmethod
-    def _row_for(path: Path, stat, probe_duration: bool) -> tuple:
+    def _entry_dict(path: Path, stat: Any, probe_duration: bool) -> dict[str, Any]:
         tokens = _entry_tokens(path)
         duration = _probe_duration(path) if probe_duration else 0.0
-        return (
-            str(path),
-            path.name,
-            path.stem,
-            path.parent.name,
-            path.suffix.lower().lstrip("."),
-            int(stat.st_size),
-            float(stat.st_mtime),
-            float(duration),
-            infer_category(tokens),
-            " ".join(sorted(tokens)),
-        )
+        return {
+            "stem": path.stem,
+            "folder": path.parent.name,
+            "ext": path.suffix.lower().lstrip("."),
+            "size": int(stat.st_size),
+            "mtime": float(stat.st_mtime),
+            "duration": float(duration),
+            "category": infer_category(tokens),
+            "tags": " ".join(sorted(tokens)),
+        }
 
     @staticmethod
-    def _flush(conn: sqlite3.Connection, rows: list[tuple]) -> None:
-        if not rows:
-            return
-        conn.executemany(
-            """
-            INSERT INTO sounds
-                (path, filename, stem, folder, ext, size, mtime, duration,
-                 category, tags)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(path) DO UPDATE SET
-                filename=excluded.filename, stem=excluded.stem,
-                folder=excluded.folder, ext=excluded.ext, size=excluded.size,
-                mtime=excluded.mtime, duration=excluded.duration,
-                category=excluded.category, tags=excluded.tags
-            """,
-            rows,
-        )
-
-    @staticmethod
-    def _prune(conn: sqlite3.Connection, roots: list[Path], seen: set[str]) -> int:
-        """Delete rows under the scanned roots whose files no longer exist."""
+    def _prune(
+        sounds: dict[str, dict[str, Any]], roots: list[Path], seen: set[str]
+    ) -> int:
+        """Drop entries under the scanned roots whose files no longer exist."""
         prefixes = [str(root) for root in roots]
-        stale: list[str] = []
-        for row in conn.execute("SELECT path FROM sounds"):
-            path = row["path"]
-            if path in seen:
-                continue
-            if any(path == p or path.startswith(p + "/") or path.startswith(p + "\\")
-                   for p in prefixes):
-                stale.append(path)
-        if stale:
-            conn.executemany("DELETE FROM sounds WHERE path = ?", ((p,) for p in stale))
+        stale = [
+            key
+            for key in sounds
+            if key not in seen
+            and any(
+                key == p or key.startswith(p + "/") or key.startswith(p + "\\")
+                for p in prefixes
+            )
+        ]
+        for key in stale:
+            del sounds[key]
         return len(stale)
 
     # -------------------------------------------------------------------- search
@@ -339,22 +315,19 @@ class LibraryCatalog:
         if self._cache is not None:
             return self._cache
         entries: list[LibraryEntry] = []
-        with self._connect() as conn:
-            for row in conn.execute(
-                "SELECT path, stem, folder, ext, duration, category, tags FROM sounds"
-            ):
-                tags = row["tags"] or ""
-                entries.append(
-                    LibraryEntry(
-                        path=row["path"],
-                        stem=row["stem"],
-                        folder=row["folder"],
-                        ext=row["ext"],
-                        duration=float(row["duration"] or 0.0),
-                        category=row["category"] or "",
-                        tokens=frozenset(tags.split()) if tags else frozenset(),
-                    )
+        for path, row in self._read_raw().items():
+            tags = row.get("tags") or ""
+            entries.append(
+                LibraryEntry(
+                    path=path,
+                    stem=row.get("stem", Path(path).stem),
+                    folder=row.get("folder", ""),
+                    ext=row.get("ext", ""),
+                    duration=float(row.get("duration", 0.0) or 0.0),
+                    category=row.get("category", "") or "",
+                    tokens=frozenset(tags.split()) if tags else frozenset(),
                 )
+            )
         self._cache = entries
         return entries
 
@@ -403,25 +376,24 @@ class LibraryCatalog:
 
     def count(self) -> int:
         """Return the number of cataloged sounds."""
-        with self._connect() as conn:
-            return int(conn.execute("SELECT COUNT(*) FROM sounds").fetchone()[0])
+        return len(self._load_all())
 
-    def stats(self) -> dict:
+    def stats(self) -> dict[str, Any]:
         """Return counts by category plus a total (for reporting/UI)."""
-        with self._connect() as conn:
-            total = int(conn.execute("SELECT COUNT(*) FROM sounds").fetchone()[0])
-            by_category = {
-                (row["category"] or "uncategorized"): row["n"]
-                for row in conn.execute(
-                    "SELECT category, COUNT(*) AS n FROM sounds "
-                    "GROUP BY category ORDER BY n DESC"
-                )
-            }
-        return {"total": total, "by_category": by_category, "db_path": str(self._db_path)}
+        by_category: dict[str, int] = {}
+        for entry in self._load_all():
+            key = entry.category or "uncategorized"
+            by_category[key] = by_category.get(key, 0) + 1
+        ordered = dict(
+            sorted(by_category.items(), key=lambda item: item[1], reverse=True)
+        )
+        return {
+            "total": len(self._load_all()),
+            "by_category": ordered,
+            "path": str(self._path),
+        }
 
     def clear(self) -> None:
-        """Remove every entry from the catalog (keeps the empty database)."""
-        with self._connect() as conn:
-            conn.execute("DELETE FROM sounds")
-            conn.commit()
+        """Remove every entry from the catalog (writes an empty catalog file)."""
+        self._write_raw({})
         self._cache = None
