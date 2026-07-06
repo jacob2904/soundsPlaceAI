@@ -98,7 +98,19 @@ QPushButton:pressed { background-color: #E86A4B; }
 """
 
 _BRAINS = ["gemini", "openai", "claude"]
-_SOUNDS = ["epidemic", "artlist", "audiio", "musicbed", "soundly", "freesound", "local"]
+_SOUNDS = [
+    "epidemic",
+    "artlist",
+    "audiio",
+    "musicbed",
+    "splice",
+    "soundly",
+    "freesound",
+    "local",
+    "catalog",
+]
+# Providers whose library folder(s) are configured via the LibraryPath field.
+_FOLDER_PROVIDERS = ("soundly", "local", "splice", "catalog")
 _SCOPES = [("Current clip", SELECT_CURRENT),
            ("Whole timeline", SELECT_ALL),
            ("Colored clips", SELECT_COLOR)]
@@ -196,12 +208,30 @@ def _build_window(ui, dispatcher):
                 ui.VGroup(
                     {"Weight": 0},
                     [
-                        ui.Label({"Text": "Local library folder (Soundly / Local only)"}),
-                        ui.LineEdit(
+                        ui.Label(
                             {
-                                "ID": "LibraryPath",
-                                "PlaceholderText": "e.g. ~/Soundly/Library",
+                                "Text": "Library folder(s) — Soundly / Splice / Local / "
+                                "Catalog (comma-separate multiple for Catalog)"
                             }
+                        ),
+                        ui.HGroup(
+                            {"Weight": 0, "Spacing": 8},
+                            [
+                                ui.LineEdit(
+                                    {
+                                        "ID": "LibraryPath",
+                                        "PlaceholderText": "e.g. ~/SFX, ~/Music/Sound Effects",
+                                        "Weight": 1,
+                                    }
+                                ),
+                                ui.Button(
+                                    {
+                                        "ID": "ScanLibrary",
+                                        "Text": "Scan library",
+                                        "Weight": 0,
+                                    }
+                                ),
+                            ],
                         ),
                     ],
                 ),
@@ -272,10 +302,14 @@ def _apply_settings_to_ui(items, settings: UserSettings) -> None:
         items["Scope"].CurrentIndex = scope_values.index(settings.scope)
     items["Color"].Text = settings.color or "Orange"
     items["DryRun"].Checked = bool(settings.dry_run)
-    # Show whichever library path applies to the selected provider.
+    # Show whichever library folder(s) apply to the selected provider.
     provider = settings.sound_provider or "epidemic"
-    lib = settings.provider_overrides.get(provider, {}).get("library_path", "")
-    items["LibraryPath"].Text = lib or ""
+    overrides = settings.provider_overrides.get(provider, {})
+    if provider == "catalog":
+        roots = overrides.get("roots") or []
+        items["LibraryPath"].Text = ", ".join(roots) if isinstance(roots, list) else str(roots)
+    else:
+        items["LibraryPath"].Text = overrides.get("library_path", "") or ""
 
 
 def _read_settings_from_ui(items) -> UserSettings:
@@ -287,9 +321,48 @@ def _read_settings_from_ui(items) -> UserSettings:
     settings.color = items["Color"].Text or "Orange"
     settings.dry_run = bool(items["DryRun"].Checked)
     library_path = (items["LibraryPath"].Text or "").strip()
-    if library_path and settings.sound_provider in ("soundly", "local"):
-        settings.set_provider_override(settings.sound_provider, "library_path", library_path)
+    provider = settings.sound_provider
+    if provider == "catalog" and library_path:
+        roots = [part.strip() for part in library_path.split(",") if part.strip()]
+        settings.set_provider_override("catalog", "roots", roots)
+    elif provider in ("soundly", "local", "splice") and library_path:
+        settings.set_provider_override(provider, "library_path", library_path)
     return settings
+
+
+def _scan_library(items, ui_call) -> None:
+    """Index the user's own sound library into the catalog (off the UI thread)."""
+    def status(text):
+        ui_call(lambda: setattr(items["Status"], "Text", text))
+
+    def append(text):
+        def _do():
+            existing = items["Output"].PlainText or ""
+            items["Output"].PlainText = f"{existing}\n{text}" if existing else text
+        ui_call(_do)
+
+    try:
+        from cinesfx.sound.base import SoundProviderError
+        from cinesfx.sound.catalog import CatalogProvider
+
+        config = load_config()  # persisted UI settings already overlaid
+        settings = dict(config.raw.get("sound_providers", {}).get("catalog", {}))
+        provider = CatalogProvider(settings, config.cache_dir())
+        status("Scanning your sound library…")
+        try:
+            stats = provider.scan(progress=append)
+        except SoundProviderError as exc:
+            status("Nothing to scan.")
+            append(f"{exc}")
+            return
+        append(stats.summary())
+        status(f"Catalog ready: {stats.total} sound(s) indexed.")
+    except ConfigError as exc:
+        status("Configuration error.")
+        append(f"Configuration error: {exc}")
+    except Exception as exc:  # noqa: BLE001 - show the error in the panel
+        status("Scan error — see output below.")
+        append(f"Error: {exc}\n{traceback.format_exc()}")
 
 
 def _run_pipeline(items, settings: UserSettings, dry_run: bool, ui_call) -> None:
@@ -405,10 +478,20 @@ def main() -> None:
         items["Status"].Text = "Testing connection…"
         threading.Thread(target=_test_connection, daemon=True).start()
 
+    def on_scan(_event):
+        # Persist the current choices (incl. catalog folders) before scanning.
+        _read_settings_from_ui(items).save()
+        items["Output"].PlainText = ""
+        items["Status"].Text = "Scanning library…"
+        threading.Thread(
+            target=_scan_library, args=(items, ui_call), daemon=True
+        ).start()
+
     window.On[WINDOW_ID].Close = on_close
     window.On.ToggleLicense.Clicked = on_toggle_license
     window.On.Activate.Clicked = on_activate
     window.On.TestConn.Clicked = on_test
+    window.On.ScanLibrary.Clicked = on_scan
     window.On.Preview.Clicked = on_preview
     window.On.Run.Clicked = on_run
 

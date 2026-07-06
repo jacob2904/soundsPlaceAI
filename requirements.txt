@@ -16,6 +16,10 @@ requests>=2.31.0
 # Offline license verification (Ed25519 signatures)
 cryptography>=41.0.0
 
+# Optional: read audio durations while cataloging your own sound library
+# (the 'catalog' provider works without it — durations just stay 0).
+# tinytag>=1.10.0
+
 # Optional "brain" SDKs. These are imported lazily; install only the one you use.
 # google-generativeai>=0.7.0
 # openai>=1.30.0

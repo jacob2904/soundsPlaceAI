@@ -30,6 +30,7 @@ VALID_SOUND_PROVIDERS = (
     "soundly",
     "freesound",
     "local",
+    "catalog",
 )
 
 

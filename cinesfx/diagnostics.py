@@ -163,6 +163,9 @@ def check_sound(config: AppConfig) -> CheckResult:
         except Exception as exc:  # noqa: BLE001 - report, never raise
             return CheckResult("Sounds (splice)", False, str(exc))
 
+    if provider == "catalog":
+        return _check_catalog(config)
+
     if provider in _SOUND_LOCAL:
         library = config.library_path()
         if library and Path(library).expanduser().is_dir():
@@ -180,6 +183,40 @@ def check_sound(config: AppConfig) -> CheckResult:
         return CheckResult(f"Sounds ({provider})", True, f"{env_key} is set")
     return CheckResult(
         f"Sounds ({provider})", False, f"{env_key} is not set (add it to .env)"
+    )
+
+
+def _check_catalog(config: AppConfig) -> CheckResult:
+    """Check the user's sound catalog: DB populated and/or roots configured."""
+    from cinesfx.library.catalog import LibraryCatalog, default_db_path
+    from cinesfx.sound.catalog import resolve_catalog_roots
+
+    settings = config.sound_settings()
+    roots = resolve_catalog_roots(settings)
+    db_setting = settings.get("db_path")
+    db_path = (
+        Path(db_setting).expanduser() if db_setting else default_db_path(config.cache_dir())
+    )
+    try:
+        count = LibraryCatalog(db_path).count() if db_path.exists() else 0
+    except Exception as exc:  # noqa: BLE001 - report, never raise
+        return CheckResult("Sounds (catalog)", False, f"catalog error: {exc}")
+
+    if count > 0:
+        return CheckResult(
+            "Sounds (catalog)", True, f"{count} sound(s) indexed at {db_path}"
+        )
+    if roots:
+        return CheckResult(
+            "Sounds (catalog)",
+            False,
+            f"{len(roots)} folder(s) configured but not scanned yet — run "
+            f"'Scan library' (or --scan-library)",
+        )
+    return CheckResult(
+        "Sounds (catalog)",
+        False,
+        "no library folders configured — add folders and scan your library",
     )
 
 

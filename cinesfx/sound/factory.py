@@ -54,6 +54,10 @@ def create_sound_provider(config: AppConfig) -> SoundProvider:
         from cinesfx.sound.local import LocalFolderProvider
 
         return LocalFolderProvider(settings, cache_dir)
+    if choice == "catalog":
+        from cinesfx.sound.catalog import CatalogProvider
+
+        return CatalogProvider(settings, cache_dir)
     if choice in _PARTNER_ENV:
         from cinesfx.sound.partner import PartnerRestProvider
 

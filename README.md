@@ -46,6 +46,9 @@ breakdown.
   Enterprise API (music today); a local folder; plus configurable hooks for Audiio/Musicbed.
   Which platforms actually expose a usable API is documented honestly in
   [`docs/PROVIDERS.md`](docs/PROVIDERS.md). Add your own by implementing one small interface.
+- **Your own sound library** — catalog **every sound on your computer** once (a fast,
+  incremental SQLite index), then place your own files straight onto the timeline —
+  fully offline, no uploads or downloads. See [`docs/LIBRARY.md`](docs/LIBRARY.md).
 - **Beautiful, easy panel** — a polished dark UI with live progress; your choices are
   **saved and can be changed any time** ([`docs/SETTINGS.md`](docs/SETTINGS.md)).
 - **Scene understanding first** — the brain returns structured cues (what to place, when,
@@ -93,6 +96,7 @@ Docs:
 [`ARCHITECTURE`](docs/ARCHITECTURE.md) ·
 [`LONG_VIDEOS`](docs/LONG_VIDEOS.md) ·
 [`PROVIDERS`](docs/PROVIDERS.md) ·
+[`LIBRARY`](docs/LIBRARY.md) ·
 [`LICENSING`](docs/LICENSING.md) ·
 [`SETTINGS`](docs/SETTINGS.md)
 

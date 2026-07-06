@@ -59,6 +59,21 @@ def test_sound_factory_splice_returns_provider(monkeypatch, tmp_path):
     assert provider.name == "splice"
 
 
+def test_sound_factory_catalog_returns_provider(tmp_path):
+    lib = tmp_path / "lib"
+    lib.mkdir()
+    (lib / "boom.wav").write_bytes(b"x")
+    config = _config(
+        sound="catalog",
+        raw={
+            "runtime": {"cache_dir": str(tmp_path / "cache")},
+            "sound_providers": {"catalog": {"roots": [str(lib)]}},
+        },
+    )
+    provider = create_sound_provider(config)
+    assert provider.name == "catalog"
+
+
 def test_sound_factory_local_requires_library(tmp_path):
     config = _config(
         sound="local",

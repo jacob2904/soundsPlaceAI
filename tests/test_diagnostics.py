@@ -110,6 +110,38 @@ def test_check_sound_local_requires_folder(tmp_path):
     assert check_sound(missing).ok is False
 
 
+def test_check_sound_catalog_states(tmp_path):
+    cache = tmp_path / "cache"
+    lib = tmp_path / "lib"
+    lib.mkdir()
+
+    # No roots configured yet → fail with a helpful message.
+    no_roots = AppConfig(
+        brain="gemini",
+        sound_provider="catalog",
+        raw={"runtime": {"cache_dir": str(cache)}, "sound_providers": {"catalog": {}}},
+    )
+    assert check_sound(no_roots).ok is False
+
+    # Roots configured but not scanned → fail (asks user to scan).
+    configured = AppConfig(
+        brain="gemini",
+        sound_provider="catalog",
+        raw={
+            "runtime": {"cache_dir": str(cache)},
+            "sound_providers": {"catalog": {"roots": [str(lib)]}},
+        },
+    )
+    assert check_sound(configured).ok is False
+
+    # After scanning some sounds → pass.
+    (lib / "hit.wav").write_bytes(b"x")
+    from cinesfx.sound.catalog import CatalogProvider
+
+    CatalogProvider({"roots": [str(lib)]}, cache_dir=cache).scan()
+    assert check_sound(configured).ok is True
+
+
 def test_summarize_counts_passes():
     results = [
         CheckResult("A", True, "ok"),

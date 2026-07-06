@@ -22,7 +22,8 @@ brains:
 
 # Which platform the effects come from. See docs/PROVIDERS.md for the full
 # capability matrix (which platforms actually expose a usable API).
-# One of: epidemic | artlist | audiio | musicbed | splice | soundly | freesound | local
+# One of: epidemic | artlist | audiio | musicbed | splice | soundly | freesound
+#         | local | catalog
 sound_provider: epidemic
 
 sound_providers:
@@ -40,6 +41,13 @@ sound_providers:
     library_path: ~/Soundly/Library
   local:                              # ✅ any local folder of audio files
     library_path: ~/SFX
+  catalog:                            # ✅ index your WHOLE computer's sound library
+    roots:                            # one or more folders to scan (recursively)
+      - ~/SFX
+      - ~/Music/Sound Effects
+    # db_path: ~/.cache/cinesfx/library.db  # optional; defaults inside cache_dir
+    probe_duration: false             # true = read durations too (needs 'tinytag')
+    auto_scan: false                  # true = auto-index on first use if empty
   audiio:                             # ✗ no public API — enterprise/bespoke only
     page_size: 15
   musicbed:                           # ✗ no public API — enterprise/bespoke only

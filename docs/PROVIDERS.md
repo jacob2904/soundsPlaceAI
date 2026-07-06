@@ -14,12 +14,14 @@ working providers integrate seamlessly with the timeline.
 | **Soundly** | ❌ none | ✅ | ✅ | ✅ **Yes** | **Local library folder** (index + match). |
 | **Splice** | ❌ none (only unofficial gRPC) | ✅ | ✅ | ✅ **Yes** (samples/one-shots) | **Local Splice folder** (auto-detected). |
 | **Local folder** | n/a | ✅ | ✅ | ✅ **Yes** | Any folder of audio files you own. |
+| **Catalog (your library)** | n/a | ✅ | ✅ | ✅ **Yes** | Index your **whole computer's** sounds once; place from a fast persistent catalog. See [LIBRARY.md](LIBRARY.md). |
 | **Artlist** | ✅ Enterprise API (OAuth2) | ✅ | ✅ | ⚠ **Music only** | Cloud API (client id/secret). SFX not yet exposed by Artlist. |
 | **Audiio** | ❌ none (enterprise/bespoke) | — | — | ✗ | Configurable partner-REST fallback only. |
 | **Musicbed** | ❌ none (enterprise/bespoke) | — | — | ✗ | Configurable partner-REST fallback only. |
 
 **For cinematic sound effects today, use:** Epidemic Sound, Freesound, Soundly
-(local), Splice (local), or a local folder. These all work end-to-end.
+(local), Splice (local), a local folder, or your own **catalog** (index every
+sound on your computer — see [LIBRARY.md](LIBRARY.md)). These all work end-to-end.
 
 ## Details & sources
 
@@ -48,6 +50,18 @@ integrate Splice. Auto-detected at `~/Splice` or `~/Documents/Splice`, or set
 `sound_providers.splice.library_path`. Implemented in `cinesfx/sound/splice.py`.
 Note: Splice's catalogue is production samples/one-shots/FX rather than a dedicated
 cinematic SFX library, but its one-shots and FX are useful for design.
+
+### Catalog (your own library) — ✅ works for SFX, offline
+Point CineSFX at one or more folders on your computer and it indexes **every**
+audio file into a small, persistent SQLite catalog (name, folder, category,
+searchable tokens, optional duration). Re-scanning is incremental (only changed
+files are touched, deleted files are pruned), so keeping a huge library current is
+cheap. Placement then searches that catalog and drops your own files onto the
+timeline — no uploads, no downloads, fully offline. Set
+`sound_providers.catalog.roots`, scan with the panel's **Scan library** button (or
+`--scan-library`), and pick `catalog` as the provider. Implemented in
+`cinesfx/library/catalog.py` + `cinesfx/sound/catalog.py`. Full guide:
+[LIBRARY.md](LIBRARY.md).
 
 ### Artlist — ⚠ real API, music only (for now)
 Artlist publishes a real **Enterprise API** (`developer.artlist.io`) using OAuth 2.0

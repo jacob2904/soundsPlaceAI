@@ -63,6 +63,27 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Run environment checks (Resolve, FFmpeg, keys, license) and exit.",
     )
+    parser.add_argument(
+        "--scan-library",
+        action="store_true",
+        help="Index your own sound library into the catalog and exit.",
+    )
+    parser.add_argument(
+        "--library-roots",
+        nargs="+",
+        metavar="FOLDER",
+        help="Folder(s) to scan for --scan-library (overrides config roots).",
+    )
+    parser.add_argument(
+        "--library-stats",
+        action="store_true",
+        help="Show how many sounds are in your catalog (by category) and exit.",
+    )
+    parser.add_argument(
+        "--probe-duration",
+        action="store_true",
+        help="Also read audio durations while scanning (needs 'tinytag').",
+    )
     parser.add_argument("--config", help="Path to config.yaml.")
     parser.add_argument("--env", help="Path to a .env file.")
     return parser.parse_args(argv)
@@ -96,6 +117,44 @@ def _handle_license_commands(args: argparse.Namespace) -> int | None:
     return None
 
 
+def _handle_library_commands(args: argparse.Namespace) -> int | None:
+    """Handle --scan-library / --library-stats. Returns exit code or None."""
+    if not (args.scan_library or args.library_stats):
+        return None
+
+    from cinesfx.config import load_config
+    from cinesfx.sound.base import SoundProviderError
+    from cinesfx.sound.catalog import CatalogProvider
+
+    try:
+        config = load_config(config_path=args.config, env_path=args.env)
+    except ConfigError as exc:
+        print(f"Configuration error: {exc}")
+        return 2
+
+    settings = dict(config.raw.get("sound_providers", {}).get("catalog", {}))
+    if args.library_roots:
+        settings["roots"] = args.library_roots
+    if args.probe_duration:
+        settings["probe_duration"] = True
+    provider = CatalogProvider(settings, config.cache_dir())
+
+    if args.scan_library:
+        try:
+            stats = provider.scan(progress=print)
+        except SoundProviderError as exc:
+            print(f"Scan failed: {exc}")
+            return 1
+        print(stats.summary())
+
+    if args.library_stats:
+        info = provider.catalog.stats()
+        print(f"Catalog: {info['total']} sound(s) at {info['db_path']}")
+        for category, count in info["by_category"].items():
+            print(f"  {category:>14}: {count}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code."""
     args = _parse_args(argv if argv is not None else sys.argv[1:])
@@ -104,6 +163,10 @@ def main(argv: list[str] | None = None) -> int:
     license_result = _handle_license_commands(args)
     if license_result is not None:
         return license_result
+
+    library_result = _handle_library_commands(args)
+    if library_result is not None:
+        return library_result
 
     if args.doctor:
         from cinesfx.config import load_config
