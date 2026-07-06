@@ -58,6 +58,11 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Show the current license status and exit.",
     )
+    parser.add_argument(
+        "--doctor",
+        action="store_true",
+        help="Run environment checks (Resolve, FFmpeg, keys, license) and exit.",
+    )
     parser.add_argument("--config", help="Path to config.yaml.")
     parser.add_argument("--env", help="Path to a .env file.")
     return parser.parse_args(argv)
@@ -99,6 +104,18 @@ def main(argv: list[str] | None = None) -> int:
     license_result = _handle_license_commands(args)
     if license_result is not None:
         return license_result
+
+    if args.doctor:
+        from cinesfx.config import load_config
+        from cinesfx.diagnostics import run_diagnostics, summarize
+
+        try:
+            config = load_config(config_path=args.config, env_path=args.env)
+        except ConfigError:
+            config = None
+        results = run_diagnostics(config=config)
+        print(summarize(results))
+        return 0 if all(result.ok for result in results) else 1
 
     try:
         orchestrator = build_orchestrator(config_path=args.config, env_path=args.env)

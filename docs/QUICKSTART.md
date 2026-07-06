@@ -109,6 +109,13 @@ CineSFX is built for them — it samples key-frames *smartly across the whole vi
 and batches the AI calls so an hour-long clip is fast and affordable. See
 [`LONG_VIDEOS.md`](LONG_VIDEOS.md).
 
+## Verify your setup in one click
+
+Click **Test connection** in the panel (or run `python -m scripts.run_cli --doctor`)
+to check, in one go: FFmpeg, the Resolve connection + current project/timeline +
+clip count, your selected brain's API key, your sound provider's key/library, and
+your license status. Each line tells you exactly what to fix if something's off.
+
 ## Troubleshooting
 
 - **"Fusion UIManager is unavailable"** — run the panel from *inside* Resolve.

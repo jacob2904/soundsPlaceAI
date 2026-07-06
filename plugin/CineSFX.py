@@ -27,6 +27,7 @@ if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
 from cinesfx.config import ConfigError, load_config  # noqa: E402
+from cinesfx.diagnostics import run_diagnostics, summarize  # noqa: E402
 from cinesfx.orchestrator import Orchestrator  # noqa: E402
 from cinesfx.resolve.timeline_agent import (  # noqa: E402
     SELECT_ALL,
@@ -237,6 +238,7 @@ def _build_window(ui, dispatcher):
                 ui.HGroup(
                     {"Weight": 0, "Spacing": 10},
                     [
+                        ui.Button({"ID": "TestConn", "Text": "Test connection"}),
                         ui.Button({"ID": "Preview", "Text": "Preview (free)"}),
                         ui.Button(
                             {"ID": "Run", "Text": "Place SFX", "StyleSheet": _PRIMARY_BTN}
@@ -381,9 +383,32 @@ def main() -> None:
     def on_run(_event):
         start(dry_run=bool(items["DryRun"].Checked))
 
+    def _test_connection():
+        try:
+            config = load_config()
+        except ConfigError:
+            config = None  # diagnostics reports config problems as failed checks
+        results = run_diagnostics(config=config, resolve_obj=resolve)
+        report = summarize(results)
+        ok = all(result.ok for result in results)
+        ui_call(lambda: setattr(items["Output"], "PlainText", report))
+        ui_call(
+            lambda: setattr(
+                items["Status"],
+                "Text",
+                "All checks passed." if ok else "Some checks need attention.",
+            )
+        )
+
+    def on_test(_event):
+        items["Output"].PlainText = ""
+        items["Status"].Text = "Testing connection…"
+        threading.Thread(target=_test_connection, daemon=True).start()
+
     window.On[WINDOW_ID].Close = on_close
     window.On.ToggleLicense.Clicked = on_toggle_license
     window.On.Activate.Clicked = on_activate
+    window.On.TestConn.Clicked = on_test
     window.On.Preview.Clicked = on_preview
     window.On.Run.Clicked = on_run
 
