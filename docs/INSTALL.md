@@ -28,8 +28,8 @@ cp config.example.yaml config.yaml
 ```
 
 Edit `config.yaml` to choose your `brain` (gemini/openai/claude) and
-`sound_provider` (epidemic/artlist/audiio/musicbed/soundly/freesound/local), and
-set any local library paths.
+`sound_provider` (epidemic/freesound/artlist/audiio/musicbed/splice/soundly/local/
+catalog), and set any local library paths.
 
 > **Fastest zero-cost setup:** `brain: gemini` + `sound_provider: freesound`. Both
 > only need a free API key.

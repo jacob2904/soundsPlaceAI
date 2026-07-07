@@ -63,6 +63,38 @@ breakdown.
 
 ---
 
+## Requirements & dependencies
+
+**System (not pip):**
+- **DaVinci Resolve 21 Studio** — required only for real timeline runs (the free
+  edition can't script). Not needed to run the unit tests or the library/`--doctor` CLI.
+- **Python 3.9+**.
+- **FFmpeg + ffprobe** on your `PATH` — used for scene analysis / key-frame extraction.
+  `macOS: brew install ffmpeg` · `Windows: winget install Gyan.FFmpeg` · `Linux: sudo apt install ffmpeg`.
+
+**Python packages:**
+- **Core** (always) — `pip install -r requirements.txt`: `scenedetect`, `opencv-python`,
+  `numpy`, `Pillow`, `PyYAML`, `python-dotenv`, `httpx`, `cryptography`.
+- **A brain SDK** (pick the one matching your `brain` setting) — `google-generativeai`
+  (gemini, default), `openai`, or `anthropic`. Install just one.
+- **Optional** — `tinytag` (only to read audio durations when cataloging your own library).
+
+Everything is also declared in [`pyproject.toml`](pyproject.toml) as extras, so you can
+instead do an editable install and pull exactly what you need:
+
+```bash
+pip install -e ".[gemini]"      # core + the Gemini brain SDK
+pip install -e ".[dev]"         # core + pytest (to run the test suite)
+# extras available: gemini · openai · claude · library · dev
+```
+
+> **Zero-cost start:** `brain: gemini` + `sound_provider: freesound` — both need only a
+> free API key. For a fully offline pipeline use the `local`/`catalog` sound provider.
+>
+> **Just running the tests?** They need only `pytest` — no Resolve, FFmpeg, or API keys.
+
+---
+
 ## Quick start
 
 **➡ The fastest, step-by-step path to testing it is [`docs/QUICKSTART.md`](docs/QUICKSTART.md)

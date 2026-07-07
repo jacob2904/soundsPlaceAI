@@ -99,9 +99,11 @@ new choice sticks. (Settings live in a small file under your user config dir; se
 [`SETTINGS.md`](SETTINGS.md).)
 
 - **Switch brain:** pick gemini / openai / claude (add that SDK + its key in `.env`).
-- **Switch sound library:** pick epidemic / artlist / audiio / musicbed / soundly /
-  freesound / local. For **soundly**/**local**, set the *Local library folder* field
-  to your sounds directory.
+- **Switch sound library:** pick epidemic / freesound / artlist / audiio / musicbed /
+  splice / soundly / local / catalog. For **soundly**/**splice**/**local**, set the
+  *Library folder(s)* field to your sounds directory; for **catalog**, add one or more
+  folders and click **Sync library** to index your own sounds
+  (see [`LIBRARY.md`](LIBRARY.md)).
 
 ## What about long videos?
 

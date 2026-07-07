@@ -1,26 +1,40 @@
-# Core pipeline dependencies for soundsPlaceAI / CineSFX.
-# ffmpeg must be installed as a system binary and available on PATH.
+# Core runtime dependencies for soundsPlaceAI / CineSFX.
+# Install with:  python -m pip install -r requirements.txt
+#
+# SYSTEM DEPENDENCY (not a pip package): FFmpeg + ffprobe must be installed and on
+# your PATH for scene analysis / key-frame extraction.
+#   macOS:   brew install ffmpeg
+#   Windows: winget install Gyan.FFmpeg
+#   Linux:   sudo apt install ffmpeg
+# The unit tests do NOT require FFmpeg, Resolve, or any API key.
 
-# Scene / shot detection and frame handling
+# Scene / shot detection (opencv + numpy are the video backend it needs)
 scenedetect>=0.6.4
 opencv-python>=4.8.0
-Pillow>=10.0.0
 numpy>=1.24.0
 
-# Configuration and HTTP
-PyYAML>=6.0
-python-dotenv>=1.0.0
-httpx>=0.27.0
-requests>=2.31.0
+# Image handling for the key-frames (also required by the Gemini brain)
+Pillow>=10.0.0
+
+# Configuration + HTTP
+PyYAML>=6.0            # reads config.yaml
+python-dotenv>=1.0.0  # loads secrets from .env
+httpx>=0.27.0         # HTTP client for cloud brains / sound providers
 
 # Offline license verification (Ed25519 signatures)
 cryptography>=41.0.0
 
-# Optional: read audio durations while cataloging your own sound library
-# (the 'catalog' provider works without it — durations just stay 0).
-# tinytag>=1.10.0
-
-# Optional "brain" SDKs. These are imported lazily; install only the one you use.
-# google-generativeai>=0.7.0
-# openai>=1.30.0
-# anthropic>=0.30.0
+# ---------------------------------------------------------------------------
+# OPTIONAL — install only what you use (see README "Requirements & dependencies"):
+#
+#   Brain (pick ONE, matching your `brain` setting):
+#     pip install google-generativeai   # gemini (default)
+#     pip install openai                # openai
+#     pip install anthropic             # claude
+#
+#   Your own sound-library catalog, to read durations while scanning:
+#     pip install tinytag
+#
+#   Dev / tests:
+#     pip install pytest
+# ---------------------------------------------------------------------------
