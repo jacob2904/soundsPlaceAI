@@ -247,6 +247,9 @@ def _build_window(ui, dispatcher):
                     {"ID": "SoundLibRow", "Weight": 0, "Spacing": 8, "Hidden": True},
                     [
                         ui.Button(
+                            {"ID": "AddFolder", "Text": "+ Add folder…", "Weight": 0}
+                        ),
+                        ui.Button(
                             {"ID": "CheckLibrary", "Text": "Check for changes", "Weight": 0}
                         ),
                         ui.Button(
@@ -357,7 +360,12 @@ def _configure_sound_fields(items) -> None:
         _set(items, "SoundSecretRow", "Hidden", True)
         _set(items, "SoundSecret", "Text", "")
 
-    _set(items, "SoundLibRow", "Hidden", conn.kind != KIND_CATALOG)
+    is_folderish = conn.kind in (KIND_FOLDER, KIND_CATALOG)
+    _set(items, "SoundLibRow", "Hidden", not is_folderish)
+    # Check/Sync only make sense for the persistent catalog; folder providers
+    # index live on every run, so they never need an explicit resync.
+    _set(items, "CheckLibrary", "Hidden", conn.kind != KIND_CATALOG)
+    _set(items, "SyncLibrary", "Hidden", conn.kind != KIND_CATALOG)
     _set(items, "SoundHint", "Text", conn.hint)
     _prefill_sound_primary(items, conn)
 
@@ -378,6 +386,33 @@ def _prefill_sound_primary(items, conn) -> None:
 def _status_line(result) -> str:
     marker = _CHECK if result.ok else _CROSS
     return f"{marker}  {result.message}"
+
+
+def _pick_folder() -> str:
+    """Open Resolve/Fusion's native folder picker; return "" if unavailable."""
+    fusion_obj = fusion
+    if fusion_obj is None and bmd is not None:
+        fusion_obj = bmd.scriptapp("Fusion")
+    request_dir = getattr(fusion_obj, "RequestDir", None)
+    if request_dir is None:
+        return ""
+    try:
+        chosen = request_dir("")
+    except Exception:  # noqa: BLE001 - dialog is best-effort
+        return ""
+    return str(chosen).strip() if chosen else ""
+
+
+def _append_folder(existing: str, folder: str, multi: bool) -> str:
+    """Add ``folder`` to a path field: append (catalog) or replace (single)."""
+    if not folder:
+        return existing
+    if not multi:
+        return folder
+    parts = [part.strip() for part in existing.split(",") if part.strip()]
+    if folder not in parts:
+        parts.append(folder)
+    return ", ".join(parts)
 
 
 # ---------------------------------------------------------------- settings <-> UI
@@ -667,6 +702,25 @@ def main() -> None:
             target=_sync_library, args=(items, ui_call, dry_run), daemon=True
         ).start()
 
+    def on_add_folder(_event):
+        conn = SOUND_CONNECTIONS[_sound_name(items)]
+        folder = _pick_folder()
+        if not folder:
+            items["Status"].Text = (
+                "Folder picker unavailable — type the path(s) directly, "
+                "comma-separated."
+            )
+            return
+        multi = conn.kind == KIND_CATALOG
+        items["SoundKey"].Text = _append_folder(
+            items["SoundKey"].Text or "", folder, multi
+        )
+        items["Status"].Text = (
+            "Added folder — press Connect, then Sync library."
+            if multi
+            else "Folder set — press Connect."
+        )
+
     def on_check(_event):
         _start_library(dry_run=True)
 
@@ -680,6 +734,7 @@ def main() -> None:
     window.On.Sound.CurrentIndexChanged = on_sound_changed
     window.On.ConnectBrain.Clicked = on_connect_brain
     window.On.ConnectSound.Clicked = on_connect_sound
+    window.On.AddFolder.Clicked = on_add_folder
     window.On.CheckLibrary.Clicked = on_check
     window.On.SyncLibrary.Clicked = on_sync
     window.On.TestConn.Clicked = on_test
