@@ -124,7 +124,7 @@ imported. But if you want durations in the catalog (for reporting or ambience-be
 defaults), install the optional, pure-Python reader and scan with `--probe-duration`:
 
 ```bash
-pip install tinytag
+pip install tinytag          # or: pip install ".[library]"
 python -m scripts.run_cli --scan-library --probe-duration
 ```
 

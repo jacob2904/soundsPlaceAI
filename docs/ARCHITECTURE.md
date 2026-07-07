@@ -4,6 +4,10 @@ The plugin is built as a **pipeline of cooperating agents**. Each agent has one
 responsibility, a small typed interface, and can be developed, tested, and swapped
 independently. The `Orchestrator` wires them together and runs work concurrently.
 
+> New to the codebase? Pair this with [`DEVELOPING.md`](DEVELOPING.md) (setup +
+> how to extend) and skim [`cinesfx/models.py`](../cinesfx/models.py) first — those
+> dataclasses are the shared vocabulary every agent speaks.
+
 ```
                     ┌──────────────────────────────────────────────────────────┐
                     │                     Orchestrator                          │
@@ -70,17 +74,31 @@ The pluggable licensing/library layer. Providers implement `SoundProvider`:
 
 - `search(query, filters) -> list[SoundAsset]`
 - `download(asset) -> Path` (cached by asset id + content hash)
-- Providers: `EpidemicSoundProvider` (full Partner Content API), `ArtlistProvider`,
-  `AudiioProvider`, `MusicbedProvider`, `SoundlyProvider` (indexes a **local Soundly library
-  folder**), `FreesoundProvider` (free fallback), and `LocalFolderProvider`.
-- A `SoundCache` stores downloads under a content-addressed cache dir.
+- Providers (one file each, chosen by `sound_provider` + built in `factory.py`):
+  `EpidemicSoundProvider` (full Partner Content API), `FreesoundProvider` (free public
+  API), `ArtlistProvider` (Enterprise OAuth2, music today), `SpliceProvider` and
+  `SoundlyProvider` (index a **local library folder**), `LocalFolderProvider` (any folder),
+  `CatalogProvider` (the user's own cataloged library — see below), and a generic
+  `PartnerRestProvider` for Audiio/Musicbed.
+- A `SoundCache` (`cache.py`) stores downloads under a content-addressed cache dir.
 
-> **Note on platform APIs.** Epidemic Sound and Freesound expose documented public/partner
-> REST APIs and are implemented against them. Artlist, Audiio, and Musicbed do not publish
-> open developer APIs; their providers implement the same interface against a configurable
-> REST base URL (for partners who have credentials) and otherwise raise an actionable error.
-> Soundly has no public API, so `SoundlyProvider` works against its **local library folder**
-> (the fastest, most reliable integration) and this is also where Soundly's own effects live.
+> **Note on platform APIs.** Which platforms actually expose a usable API is documented,
+> with sources, in [`PROVIDERS.md`](PROVIDERS.md). In short: Epidemic Sound and Freesound
+> have real REST APIs; Artlist has an Enterprise API (music only for now); Splice and
+> Soundly have no public API so they're integrated via their **local folders**; Audiio and
+> Musicbed have no public API and fall back to a configurable partner-REST provider.
+
+### 4b. Library catalog — `cinesfx/library/`
+Backs the `CatalogProvider` so users can place from **their own sounds on disk**.
+
+- `LibraryCatalog` scans one or many root folders and records each audio file (name,
+  folder, ext, size, mtime, inferred category, searchable tokens, optional duration) in a
+  single **JSON file — no database**.
+- Re-scanning is **incremental** (skip unchanged, refresh changed, prune deleted) and
+  supports a **`dry_run`** mode to *detect* changes without writing — this is what powers
+  the panel's "Check for changes" / "Sync library" resync buttons.
+- Search ranks by name/folder token overlap, loaded into memory once and cached so the many
+  per-cue lookups a run performs stay fast. See [`LIBRARY.md`](LIBRARY.md).
 
 ### 5. PlacementAgent — `cinesfx/placement/`
 Turns cues + audio files into concrete, synced timeline edits.
@@ -111,3 +129,32 @@ Resolve's scripting bridge is synchronous and not thread-safe for writes, so:
 
 This keeps the fast, parallel, network/CPU work off the Resolve main thread while guaranteeing
 safe, ordered edits.
+
+## Supporting modules
+
+These are not agents but everything depends on them:
+
+- **`config.py`** — loads/validates `config.yaml`, deep-merges the persisted user settings
+  overlay, and reads secrets from the environment (never from the logged config object).
+- **`settings.py`** + **`user_store.py`** — persist the end-user's changeable UI choices
+  (brain, provider, scope, provider folders, license) in the per-user, cross-platform config
+  directory as JSON.
+- **`licensing.py`** — offline Ed25519 signature verification for the one-time lifetime
+  license; `tools/` holds the vendor-side keypair/license generators. See
+  [`LICENSING.md`](LICENSING.md).
+- **`diagnostics.py`** — the "Test connection" self-checks (Resolve, ffmpeg, brain key,
+  sound provider, license) surfaced in the panel and via `run_cli --doctor`.
+- **`logging_utils.py`** — logging configured to redact secrets from every line.
+
+## Entry points
+
+- **`plugin/CineSFX.py`** — the Resolve panel. It is deliberately thin: it reads/saves
+  settings and calls the `Orchestrator` (and the catalog for library sync).
+- **`scripts/run_cli.py`** — the command-line runner (also installed as the `cinesfx`
+  console script) for previews, real runs, licensing, diagnostics, and library scan/resync.
+
+## Repository layout
+
+See the "Repository layout" tree in the top-level [`README.md`](../README.md) for a
+one-line description of every directory, and [`DEVELOPING.md`](DEVELOPING.md) for how to
+set up and extend the project.

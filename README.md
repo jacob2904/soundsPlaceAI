@@ -4,9 +4,9 @@
 
 `soundsPlaceAI` watches the clips you select on your Resolve timeline, *understands each
 scene* using a vision-capable LLM ("the brain"), finds matching sound effects from the
-licensing platform of your choice (Epidemic Sound, Artlist, Audiio, Musicbed, a local
-Soundly library, Freesound, or a plain folder), and drops them onto dedicated SFX tracks in
-**perfect sync** with what is happening on screen.
+source of your choice (Epidemic Sound, Freesound, Artlist, a local Soundly or Splice
+library, a plain folder, **or your own cataloged sound library**), and drops them onto
+dedicated SFX tracks in **perfect sync** with what is happening on screen.
 
 It does **not** generate audio. It *places* real, licensed sound effects so every scene
 sounds cinematic — footsteps, doors, whooshes, ambiences, impacts, room tone — each one
@@ -90,15 +90,51 @@ python -m scripts.run_cli --selection
 # 4c. Or use the panel: Workspace ▸ Scripts ▸ CineSFX (or Workflow Integrations)
 ```
 
-Docs:
+Docs (full index: [`docs/README.md`](docs/README.md)):
 [`QUICKSTART`](docs/QUICKSTART.md) ·
 [`INSTALL`](docs/INSTALL.md) ·
 [`ARCHITECTURE`](docs/ARCHITECTURE.md) ·
+[`DEVELOPING`](docs/DEVELOPING.md) ·
 [`LONG_VIDEOS`](docs/LONG_VIDEOS.md) ·
 [`PROVIDERS`](docs/PROVIDERS.md) ·
 [`LIBRARY`](docs/LIBRARY.md) ·
 [`LICENSING`](docs/LICENSING.md) ·
 [`SETTINGS`](docs/SETTINGS.md)
+
+---
+
+## Repository layout
+
+A new developer can get oriented in a minute — the code is a pipeline of small,
+single-responsibility agents wired together by an orchestrator. See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how they interact and
+[`docs/DEVELOPING.md`](docs/DEVELOPING.md) for setup + how to extend it.
+
+```
+soundsPlaceAI/
+├── cinesfx/                  # the Python package (all the logic lives here)
+│   ├── orchestrator.py       # ★ wires the agents together and runs the pipeline
+│   ├── models.py             # typed dataclasses passed between agents (the contracts)
+│   ├── config.py             # load/validate config.yaml + user settings overlay
+│   ├── settings.py           # persistent, changeable end-user UI choices + license
+│   ├── user_store.py         # cross-platform per-user config dir + JSON helpers
+│   ├── licensing.py          # offline Ed25519 one-time-lifetime license verification
+│   ├── diagnostics.py        # "Test connection" self-checks (Resolve/ffmpeg/keys/…)
+│   ├── logging_utils.py      # logging with automatic secret redaction
+│   ├── resolve/              # TimelineAgent — the ONLY code that talks to Resolve
+│   ├── analysis/             # SceneAgent — shot detection + ffmpeg key-frames
+│   ├── brain/                # BrainAgent — pluggable LLMs (gemini/openai/claude)
+│   ├── sound/                # SoundAgent — pluggable SFX providers (see PROVIDERS)
+│   ├── library/              # your own sound-library catalog (JSON index, no DB)
+│   └── placement/            # PlacementAgent — timing, lanes, gain/pan/fades
+├── plugin/                   # the DaVinci Resolve panel (UI) + manifest
+├── scripts/                  # run_cli.py — command-line entry point
+├── tools/                    # vendor-only license key/generation tooling
+├── tests/                    # pytest suite (one file per module, no Resolve needed)
+├── docs/                     # all documentation (start at docs/README.md)
+├── config.example.yaml       # copy → config.yaml for non-secret settings
+└── .env.example              # copy → .env for secrets (API keys, license)
+```
 
 ---
 
