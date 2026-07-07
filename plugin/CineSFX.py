@@ -7,10 +7,10 @@ cataloged library) straight from dropdowns + a **Connect** button — no manual
 ``.env`` editing. The right input fields appear dynamically for whatever the user
 picks, credentials are saved securely, and every choice is remembered.
 
-Drop this file into the Resolve "Workflow Integration Plugins" folder (inside
-``com.soundsplaceai.cinesfx``) or the "Scripts/Utility" folder. See
-docs/INSTALL.md for exact paths. Set CINESFX_HOME to this repo so the ``cinesfx``
-package can be imported.
+Installed by the one-click installer (.dmg / .exe), this runs out of the box: the
+companion ``cinesfx_bootstrap`` wires up bundled dependencies + FFmpeg so no
+``CINESFX_HOME`` or ``pip install`` is needed. It also still works from a dev
+checkout. See docs/INSTALL.md for exact paths.
 """
 
 from __future__ import annotations
@@ -20,11 +20,20 @@ import sys
 import threading
 import traceback
 
-_REPO_ROOT = os.environ.get(
-    "CINESFX_HOME", os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-)
-if _REPO_ROOT not in sys.path:
-    sys.path.insert(0, _REPO_ROOT)
+_PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
+if _PLUGIN_DIR not in sys.path:
+    sys.path.insert(0, _PLUGIN_DIR)
+
+try:  # installed layout: bundled deps + ffmpeg wired up here
+    import cinesfx_bootstrap
+
+    cinesfx_bootstrap.apply(_PLUGIN_DIR)
+except Exception:  # noqa: BLE001 - dev fallback: add the repo root directly
+    _repo_root = os.environ.get(
+        "CINESFX_HOME", os.path.dirname(_PLUGIN_DIR)
+    )
+    if _repo_root not in sys.path:
+        sys.path.insert(0, _repo_root)
 
 from cinesfx.config import ConfigError, load_config  # noqa: E402
 from cinesfx.connections import (  # noqa: E402
