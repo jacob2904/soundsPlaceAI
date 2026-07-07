@@ -28,12 +28,16 @@ Supported audio types: `.wav .mp3 .aif .aiff .flac .ogg .m4a`.
 
 ## 1. Choose your folders
 
-**In the panel:** pick **Sound library → catalog**, then type one or more folders in
-the *Library folder(s)* field, comma-separated:
+**In the panel:** pick **Sound → My sound library (catalog)**, then add as many
+folders as you want — click **+ Add folder…** to browse and append each one (repeat
+for more), or type them directly in the field, comma-separated:
 
 ```
 ~/SFX, ~/Music/Sound Effects, /Volumes/Audio/Libraries
 ```
+
+Then press **Connect**. Every folder you add is remembered and included in future
+scans/resyncs.
 
 **Or in `config.yaml`:**
 

@@ -59,12 +59,18 @@ never kills the whole clip. Cues keep their real scene index, so timing stays ex
 | `analysis.target_eval_fps` | frames/sec evaluated on long clips | `4.0` |
 | `analysis.downscale_factor` | detection frame down-scaling | `2` |
 | `analysis.max_scenes` | cap; extra shots merged (coverage kept) | `400` |
-| `analysis.frames_per_scene` | key-frames sent per scene | `2` |
+| `analysis.frames_per_scene` | key-frames extracted per scene | `1` |
+| `analysis.brain_frames_per_scene` | images actually **sent to the AI** per scene | `1` |
+| `analysis.max_images_per_request` | hard cap on images per AI call | `12` |
+| `analysis.image_detail` | OpenAI vision detail (`low` is far cheaper) | `low` |
 | `runtime.scenes_per_brain_batch` | scenes per AI call (cost control) | `12` |
 | `runtime.max_workers` | clips analysed in parallel | `4` |
 
+Images dominate vision-model cost, so the three image knobs above are the biggest
+levers on AI spend. The defaults are already tuned to be cheap.
+
 ### Rough guidance
-- **Whole feature, budget-conscious:** raise `target_eval_fps` down to `2`, keep
-  `frames_per_scene: 1`, `scenes_per_brain_batch: 16`.
+- **Whole feature, budget-conscious:** lower `target_eval_fps` to `2`, keep
+  `brain_frames_per_scene: 1`, `image_detail: low`, `scenes_per_brain_batch: 16`.
 - **Maximum precision on a short hero shot:** `frame_skip: 0`,
-  `frames_per_scene: 3`.
+  `frames_per_scene: 2`, `brain_frames_per_scene: 2`, `image_detail: high`.

@@ -128,6 +128,7 @@ Docs (full index: [`docs/README.md`](docs/README.md)):
 [`QUICKSTART`](docs/QUICKSTART.md) ·
 [`INSTALL`](docs/INSTALL.md) ·
 [`CONNECTIONS`](docs/CONNECTIONS.md) ·
+[`HOW_IT_WORKS`](docs/HOW_IT_WORKS.md) ·
 [`ARCHITECTURE`](docs/ARCHITECTURE.md) ·
 [`DEVELOPING`](docs/DEVELOPING.md) ·
 [`LONG_VIDEOS`](docs/LONG_VIDEOS.md) ·

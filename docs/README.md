@@ -8,6 +8,8 @@ Start here to find the right doc for what you're doing.
 - **[INSTALL.md](INSTALL.md)** — install the panel into DaVinci Resolve (Windows/macOS/Linux).
 - **[CONNECTIONS.md](CONNECTIONS.md)** — connect your AI brain and audio source from the
   panel (dropdown + Connect button), no `.env` editing.
+- **[HOW_IT_WORKS.md](HOW_IT_WORKS.md)** — plain-language: each sound source and *why* the
+  plugin chooses the sound-effect mix it does for each clip.
 - **[SETTINGS.md](SETTINGS.md)** — the panel's saved, changeable choices.
 - **[PROVIDERS.md](PROVIDERS.md)** — every sound source and what each can actually do.
 - **[LIBRARY.md](LIBRARY.md)** — catalog your own computer's sounds and resync when they change.
