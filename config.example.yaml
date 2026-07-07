@@ -1,0 +1,96 @@
+# ---------------------------------------------------------------------------
+# soundsPlaceAI / CineSFX non-secret configuration.
+# Copy to `config.yaml`. Secrets live in `.env`, never here.
+# ---------------------------------------------------------------------------
+
+# Which LLM understands the scenes. One of: gemini | openai | claude
+brain: gemini
+
+brains:
+  gemini:
+    model: gemini-2.5-flash          # fast + vision-capable; use -pro for max quality
+    temperature: 0.4
+    max_output_tokens: 4096
+  openai:
+    model: gpt-4o                     # any vision-capable model
+    temperature: 0.4
+    max_output_tokens: 4096
+  claude:
+    model: claude-3-5-sonnet-latest   # vision-capable
+    temperature: 0.4
+    max_output_tokens: 4096
+
+# Which platform the effects come from. See docs/PROVIDERS.md for the full
+# capability matrix (which platforms actually expose a usable API).
+# One of: epidemic | artlist | audiio | musicbed | splice | soundly | freesound
+#         | local | catalog
+sound_provider: epidemic
+
+sound_providers:
+  epidemic:                           # ✅ real Partner API (SFX). Key in .env.
+    quality: high                     # normal (128k) | high (320k)
+  freesound:                          # ✅ free public API (SFX). Key in .env.
+    page_size: 15
+  artlist:                            # ⚠ real Enterprise API, but MUSIC only today
+    page_size: 20                     # (SFX not yet exposed by Artlist). Creds in .env.
+    asset_type: song                  # 'song' today; will support 'sfx' when Artlist does
+    format: aac                       # aac | mp3 | wav
+  splice:                             # ✅ via LOCAL Splice folder (no public API exists)
+    library_path: ~/Splice            # auto-detected if omitted (~/Splice, ~/Documents/Splice)
+  soundly:                            # ✅ via LOCAL Soundly library (no public API)
+    library_path: ~/Soundly/Library
+  local:                              # ✅ any local folder of audio files
+    library_path: ~/SFX
+  catalog:                            # ✅ index your WHOLE computer's sound library
+    roots:                            # one or more folders to scan (recursively)
+      - ~/SFX
+      - ~/Music/Sound Effects
+    # catalog_path: ~/.cache/cinesfx/library.json  # optional; defaults inside cache_dir
+    probe_duration: false             # true = read durations too (needs 'tinytag')
+    auto_scan: false                  # true = auto-index on first use if empty
+  audiio:                             # ✗ no public API — enterprise/bespoke only
+    page_size: 15
+  musicbed:                           # ✗ no public API — enterprise/bespoke only
+    page_size: 15
+
+# Scene analysis (efficiency knobs).
+analysis:
+  detector: content                   # content | adaptive
+  threshold: 27.0                     # PySceneDetect sensitivity
+  downscale_factor: 2                 # >1 = analyse smaller frames = faster
+  frames_per_scene: 1                 # key-frames extracted per shot (1 = cheapest)
+  keyframe_width: 512                 # px; downscaled frames keep uploads tiny
+  min_scene_seconds: 0.4              # ignore ultra-short flashes
+  # ---- AI token cost controls (images dominate vision-model cost) ----
+  brain_frames_per_scene: 1           # images actually SENT to the AI per scene
+  max_images_per_request: 12          # hard cap on images per AI call
+  image_detail: low                   # OpenAI vision detail: 'low' is far cheaper
+  # ---- Long-clip handling (keeps hour-long videos fast & bounded) ----
+  max_scenes: 400                     # cap: extra shots are merged, keeping full coverage
+  long_clip_threshold_seconds: 600    # clips longer than this use frame-skipping
+  frame_skip: -1                      # -1 = auto (skip frames on long clips); 0 = frame-accurate
+  target_eval_fps: 4.0                # on long clips, evaluate ~this many frames/sec
+
+# How sounds are placed on the timeline.
+placement:
+  sfx_track_name: "CineSFX"           # dedicated audio track(s) created for SFX
+  max_lanes: 3                        # extra SFX tracks used to avoid overlaps
+  default_fade_ms: 40
+  max_cues_per_scene: 4               # keep scenes from getting cluttered
+  headroom_db: -3.0                   # master ceiling for placed SFX
+  ambience_gain_db: -18.0             # beds sit lower than spot effects
+  apply_audio_fx: true                # bake gain/pan/fades into each SFX (needs FFmpeg)
+  render_format: wav                  # processed clip format (wav = lossless)
+
+# Realistic (Soundly-style) spatialisation.
+spatial:
+  enabled: true
+  max_distance_attenuation_db: -12.0  # gain drop for the farthest sounds
+  max_pan: 0.8                        # clamp so nothing hard-pans unnaturally
+
+# Runtime behaviour.
+runtime:
+  max_workers: 4                      # clips analysed in parallel
+  scenes_per_brain_batch: 12          # scenes per LLM call (keeps long clips cheap)
+  cache_dir: ~/.cache/cinesfx
+  log_level: INFO

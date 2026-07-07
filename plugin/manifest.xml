@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Workflow Integration manifest for CineSFX.
+  Place this file (and CineSFX.py) inside a folder named
+  "com.soundsplaceai.cinesfx" in the Resolve "Workflow Integration Plugins"
+  directory. See docs/INSTALL.md for the per-OS path.
+-->
+<PluginManifest>
+    <Id>com.soundsplaceai.cinesfx</Id>
+    <Name>CineSFX AI</Name>
+    <Version>0.1.0</Version>
+    <Vendor>soundsPlaceAI</Vendor>
+    <Description>
+        AI-driven cinematic sound-effects placement. Understands each scene and
+        inserts synced, licensed sound effects onto dedicated SFX tracks.
+    </Description>
+    <Main>CineSFX.py</Main>
+    <ScriptingLanguage>Python</ScriptingLanguage>
+    <MinResolveVersion>21.0</MinResolveVersion>
+    <RequiresStudio>true</RequiresStudio>
+</PluginManifest>

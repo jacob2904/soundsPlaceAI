@@ -1,0 +1,25 @@
+# Secrets & local config
+.env
+config.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# Caches & generated media
+.cache/
+*.log
+/tmp_keyframes/
+
+# Vendor licensing secrets (never commit private keys)
+vendor_private_key*
+*private_key*.pem
+tools/*.secret
