@@ -40,9 +40,15 @@ The only module that talks to DaVinci Resolve.
   (`GetMediaPoolItem().GetClipProperty("File Path")`), the clip's source in/out frames
   (`GetLeftOffset`/`GetRightOffset`/`GetSourceStartFrame`), its timeline position
   (`GetStart`/`GetEnd`), and the timeline frame-rate.
-- **Writes:** appends downloaded SFX to a dedicated, named audio track using
+- **Writes:** appends the (already-processed) SFX to a dedicated, named audio track using
   `MediaPool.AppendToTimeline([{clipInfo}])` with `mediaType=2` (audio only), `trackIndex`,
-  and `recordFrame` for sample-accurate placement. It then sets per-item gain/pan/fades.
+  and `recordFrame` for sample-accurate placement.
+- **Gain/pan/fades are baked in first.** Resolve's scripting API doesn't expose per-clip
+  audio gain/pan/fades, so the `AudioRenderer` (`cinesfx/audio/render.py`) pre-renders each
+  SFX with FFmpeg — `volume` (gain incl. distance attenuation), a constant-power stereo
+  `pan`, `afade` in/out, trimmed to the exact placed length — so the clip sounds correct in
+  the final render. A marker + clip name record the applied values (and if FFmpeg is missing
+  it falls back to the raw file, keeping just the annotation).
 - Never touches the user's original clips → non-destructive.
 
 Because we work from the *source file* and Resolve's frame math, **no export/upload of the
@@ -111,10 +117,16 @@ Turns cues + audio files into concrete, synced timeline edits.
   idea Soundly-style tools use to seat a sound in space.
 - Adds short fades for clean transitions.
 
+## Audio renderer — `cinesfx/audio/render.py`
+- Bakes each placement's gain/pan/fades into the SFX file with FFmpeg (trimmed to the placed
+  length), so the values are actually audible in the render. Content-addressed + cached, and
+  a no-op fallback when FFmpeg is absent.
+
 ## Orchestrator — `cinesfx/orchestrator.py`
 - Loads config + secrets.
 - For each selected clip, runs SceneAgent → BrainAgent → SoundAgent concurrently across
-  clips (thread pool; the network + ffmpeg work is I/O bound).
+  clips (thread pool; the network + ffmpeg work is I/O bound), then bakes the audio fx
+  (non-preview runs) so placement is parallel too.
 - Collects a `PlacementPlan`, prints a human-readable preview + cost estimate, and — unless
   `--dry-run` — hands it to the PlacementAgent.
 

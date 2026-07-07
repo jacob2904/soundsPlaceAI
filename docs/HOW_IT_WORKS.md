@@ -15,8 +15,10 @@ For every clip you select, CineSFX:
 5. **Places it on the timeline** at the exact moment, on its own audio track(s),
    in sync — quieter for backgrounds, panned left/right to match the screen.
 
-Previewing this plan is always **free**; actually placing the sounds is the paid
-action (one-time license).
+The loudness, left/right position, and fade in/out are **applied automatically** to
+each sound (baked into the audio when it's placed, so it sounds right in your final
+export — no manual mixing required). Previewing the plan is always **free**;
+actually placing the sounds is the paid action (one-time license).
 
 ## Why it picks the combination it does
 

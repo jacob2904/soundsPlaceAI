@@ -162,6 +162,7 @@ soundsPlaceAI/
 │   ├── brain/                # BrainAgent — pluggable LLMs (gemini/openai/claude)
 │   ├── sound/                # SoundAgent — pluggable SFX providers (see PROVIDERS)
 │   ├── library/              # your own sound-library catalog (JSON index, no DB)
+│   ├── audio/                # AudioRenderer — bakes gain/pan/fades via FFmpeg
 │   └── placement/            # PlacementAgent — timing, lanes, gain/pan/fades
 ├── plugin/                   # the DaVinci Resolve panel (UI) + manifest
 ├── scripts/                  # run_cli.py — command-line entry point
