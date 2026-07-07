@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from cinesfx.analysis import SceneAgent
+from cinesfx.audio import AudioRenderer
 from cinesfx.brain import BrainProvider, create_brain
 from cinesfx.config import AppConfig, load_config
 from cinesfx.logging_utils import configure_logging, get_logger
@@ -75,6 +76,12 @@ class Orchestrator:
         self._sound = sound_provider
         self._scene_agent = SceneAgent(config.analysis(), self._cache_dir)
         self._placement_agent = PlacementAgent(config.placement(), config.spatial())
+        placement_cfg = config.placement()
+        self._renderer = AudioRenderer(
+            placement_cfg,
+            self._cache_dir,
+            enabled=bool(placement_cfg.get("apply_audio_fx", True)),
+        )
 
     # ------------------------------------------------------------------ public API
 
@@ -115,7 +122,7 @@ class Orchestrator:
             return []
 
         report(f"Analysing {len(clips)} clip(s)…")
-        results = self._process_clips_concurrently(clips, report)
+        results = self._process_clips_concurrently(clips, report, dry_run)
 
         if dry_run:
             _log.info("Dry-run: %d clip(s) planned; no timeline changes made.",
@@ -159,14 +166,18 @@ class Orchestrator:
     # ------------------------------------------------------------------ pipeline
 
     def _process_clips_concurrently(
-        self, clips: list[ClipSelection], report: Callable[[str], None]
+        self,
+        clips: list[ClipSelection],
+        report: Callable[[str], None],
+        dry_run: bool,
     ) -> list[ClipResult]:
         """Run the analyse+plan stage for every clip across a thread pool."""
         results: list[ClipResult] = []
         done = 0
         with ThreadPoolExecutor(max_workers=self._max_workers) as pool:
             futures = {
-                pool.submit(self._process_single_clip, clip): clip for clip in clips
+                pool.submit(self._process_single_clip, clip, dry_run): clip
+                for clip in clips
             }
             for future in as_completed(futures):
                 clip = futures[future]
@@ -181,13 +192,24 @@ class Orchestrator:
         results.sort(key=lambda item: item.clip.timeline_start_frame)
         return results
 
-    def _process_single_clip(self, clip: ClipSelection) -> ClipResult:
+    def _process_single_clip(self, clip: ClipSelection, dry_run: bool) -> ClipResult:
         """Full analyse+plan for one clip (safe to run in a worker thread)."""
         scenes = self._scene_agent.analyze(clip)
         cues = self._plan_cues_batched(clip, scenes)
         resolved = self._resolve_cues(clip, cues)
         plan = self._placement_agent.plan_for_clip(clip, scenes, resolved)
+        # Bake gain/pan/fades into each SFX file now (parallel per clip). Skipped
+        # for previews since nothing is written to the timeline then.
+        if not dry_run:
+            self._apply_audio_fx(clip, plan)
         return ClipResult(clip=clip, scenes=scenes, plan=plan)
+
+    def _apply_audio_fx(self, clip: ClipSelection, plan: PlacementPlan) -> None:
+        """Render each placement's audio with baked gain/pan/fades in place."""
+        if not self._renderer.available:
+            return
+        for placement in plan.placements:
+            placement.audio_file = self._renderer.render(placement, clip.fps)
 
     def _plan_cues_batched(
         self, clip: ClipSelection, scenes: list[Scene]

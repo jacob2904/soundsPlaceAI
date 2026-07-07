@@ -93,6 +93,7 @@ class PlacementAgent:
                     pan=spatial.pan,
                     fade_in_frames=fade_frames,
                     fade_out_frames=fade_frames,
+                    duration_frames=duration_frames,
                 )
             )
             lane_free_at[lane] = record_frame + max(1, duration_frames)

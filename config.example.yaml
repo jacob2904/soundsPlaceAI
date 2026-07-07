@@ -79,6 +79,8 @@ placement:
   max_cues_per_scene: 4               # keep scenes from getting cluttered
   headroom_db: -3.0                   # master ceiling for placed SFX
   ambience_gain_db: -18.0             # beds sit lower than spot effects
+  apply_audio_fx: true                # bake gain/pan/fades into each SFX (needs FFmpeg)
+  render_format: wav                  # processed clip format (wav = lossless)
 
 # Realistic (Soundly-style) spatialisation.
 spatial:

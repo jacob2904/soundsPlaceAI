@@ -208,11 +208,12 @@ class TimelineAgent:
             return False
 
     def _annotate(self, audio_item: Any, placement: PlannedPlacement) -> None:
-        """Record intended gain/pan/fades on the inserted audio clip.
+        """Record the gain/pan/fades on the inserted audio clip.
 
-        The Resolve API does not expose audio clip gain/pan, so the intent is
-        stored as a marker with JSON customData and encoded in the clip name for a
-        follow-up Fairlight pass (or a companion DaVinci macro).
+        These values are baked into the audio file by the AudioRenderer before
+        import, so the clip already sounds correct. The marker + clip name keep a
+        human-readable record of exactly what was applied (handy for review or a
+        further Fairlight tweak).
         """
         cue = placement.cue
         label = (
@@ -226,6 +227,7 @@ class TimelineAgent:
                 "pan": placement.pan,
                 "fade_in": placement.fade_in_frames,
                 "fade_out": placement.fade_out_frames,
+                "applied": True,
                 "kind": cue.kind.value,
                 "query": cue.query,
                 "provider": placement.asset.provider,

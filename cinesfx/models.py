@@ -144,6 +144,7 @@ class PlannedPlacement:
     pan: float                 # final pan after spatialisation clamp
     fade_in_frames: int
     fade_out_frames: int
+    duration_frames: int = 0   # placed length in frames (0 = use asset's length)
 
 
 @dataclass
