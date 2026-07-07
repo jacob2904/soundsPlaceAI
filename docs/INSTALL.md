@@ -1,7 +1,41 @@
 # Installation & setup
 
 CineSFX needs **DaVinci Resolve 21 Studio** (the free edition does not allow
-scripting / Workflow Integrations), Python 3.9+, and FFmpeg on your `PATH`.
+scripting / Workflow Integrations).
+
+## Easiest: the one-click installer (recommended)
+
+Most people should just use the installer for their OS — it's self-contained, so
+there's **nothing else to install** (no Python packages, no FFmpeg, no
+`CINESFX_HOME`). After it finishes, the panel works out of the box.
+
+1. **macOS:** open `CineSFX-Installer.dmg` and double-click **Install CineSFX.command**
+   (approve the admin prompt).
+   **Windows:** run `CineSFX-Setup.exe`.
+2. Restart DaVinci Resolve.
+3. Open **Workspace ▸ Workflow Integrations ▸ CineSFX AI**.
+4. In the panel's **Connections** section, pick your AI brain + audio source and
+   click **Connect** (see [CONNECTIONS.md](CONNECTIONS.md)). That's it.
+
+> The installer copies a bundled plugin into Resolve's *Workflow Integration
+> Plugins* folder; `plugin/cinesfx_bootstrap.py` wires the bundled dependencies +
+> FFmpeg at launch. To remove it, delete the `com.soundsplaceai.cinesfx` folder
+> (paths in the table below) or run `python -m cinesfx.installer --uninstall`.
+
+**Building the installers** (maintainers, on each OS): see
+[`packaging/README.md`](../packaging/README.md). In short:
+`bash packaging/macos/build_dmg.sh` (macOS) or
+`powershell -File packaging\windows\build_exe.ps1` (Windows).
+
+**Install from a checkout without an installer:** `python -m cinesfx.installer`
+copies the plugin into the right Resolve folder for your OS.
+
+---
+
+## Manual / developer setup
+
+The rest of this page covers running from source (for development or the CLI). It
+additionally needs Python 3.9+ and FFmpeg on your `PATH`.
 
 ## 1. Get the code and dependencies
 

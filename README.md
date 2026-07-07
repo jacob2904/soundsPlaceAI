@@ -164,7 +164,8 @@ soundsPlaceAI/
 │   ├── library/              # your own sound-library catalog (JSON index, no DB)
 │   ├── audio/                # AudioRenderer — bakes gain/pan/fades via FFmpeg
 │   └── placement/            # PlacementAgent — timing, lanes, gain/pan/fades
-├── plugin/                   # the DaVinci Resolve panel (UI) + manifest
+├── plugin/                   # the DaVinci Resolve panel (UI) + manifest + bootstrap
+├── packaging/                # one-click installer build tooling (.dmg / .exe)
 ├── scripts/                  # run_cli.py — command-line entry point
 ├── tools/                    # vendor-only license key/generation tooling
 ├── tests/                    # pytest suite (one file per module, no Resolve needed)
