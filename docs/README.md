@@ -6,6 +6,8 @@ Start here to find the right doc for what you're doing.
 
 - **[QUICKSTART.md](QUICKSTART.md)** — the fastest path to testing it (~5 minutes, free tools).
 - **[INSTALL.md](INSTALL.md)** — install the panel into DaVinci Resolve (Windows/macOS/Linux).
+- **[CONNECTIONS.md](CONNECTIONS.md)** — connect your AI brain and audio source from the
+  panel (dropdown + Connect button), no `.env` editing.
 - **[SETTINGS.md](SETTINGS.md)** — the panel's saved, changeable choices.
 - **[PROVIDERS.md](PROVIDERS.md)** — every sound source and what each can actually do.
 - **[LIBRARY.md](LIBRARY.md)** — catalog your own computer's sounds and resync when they change.

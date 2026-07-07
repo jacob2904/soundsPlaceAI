@@ -19,18 +19,26 @@ python -m pip install google-generativeai          # the (free-tier) Gemini brai
 Install FFmpeg if you don't have it:
 - macOS: `brew install ffmpeg`  ·  Windows: `winget install Gyan.FFmpeg`  ·  Linux: `sudo apt install ffmpeg`
 
-## Step 2 — Add two free API keys
+## Step 2 — Get two free API keys
 
-```bash
-cp .env.example .env
-```
-
-Open `.env` and fill in:
+Grab these (both free, ~1 minute each):
 - `GEMINI_API_KEY` — free key from https://aistudio.google.com/apikey
 - `FREESOUND_API_KEY` — free key from https://freesound.org/apiv2/apply/
 
-That's all you need to try it. (You can switch to Epidemic Sound / Artlist /
-Audiio / Musicbed / a local Soundly library later — see below.)
+**Easiest way to connect them: the panel.** In Step 3 you'll open CineSFX, and its
+**Connections** section lets you pick your brain + audio source from dropdowns,
+paste each key, and press **Connect** — no files to edit. See
+[CONNECTIONS.md](CONNECTIONS.md).
+
+Prefer the terminal / a secret manager? You can instead put them in a `.env`:
+
+```bash
+cp .env.example .env   # then fill in the two keys above
+```
+
+Either way works — a real env var / `.env` always wins over a key entered in the
+panel. (You can switch to Epidemic Sound / Artlist / Audiio / Musicbed / a local
+Soundly library or your own cataloged library later — see below.)
 
 ## Step 3 — Install the panel into Resolve
 

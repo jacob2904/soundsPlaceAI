@@ -15,8 +15,10 @@ A small JSON file in your per-user config directory:
 | Windows | `%APPDATA%\cinesfx\settings.json` |
 | Linux | `~/.config/cinesfx/settings.json` (respects `XDG_CONFIG_HOME`) |
 
-Your activated license is stored alongside it in `license.json`. Override the
-directory with the `CINESFX_CONFIG_DIR` environment variable (handy for testing).
+Your activated license is stored alongside it in `license.json`, and any API keys
+you connect in the panel live in `connections.json` (see
+[CONNECTIONS.md](CONNECTIONS.md)). Override the directory with the
+`CINESFX_CONFIG_DIR` environment variable (handy for testing).
 
 ## Precedence
 
@@ -33,7 +35,8 @@ overlays the specific keys the user changed.
 ## What gets persisted
 
 - `brain` (gemini / openai / claude)
-- `sound_provider` (epidemic / artlist / audiio / musicbed / soundly / freesound / local)
+- `sound_provider` (epidemic / freesound / artlist / audiio / musicbed / splice /
+  soundly / local / catalog)
 - `scope` (current / all / color) and `color`
 - `dry_run` (preview toggle)
 - Per-provider overrides, e.g. the Soundly/Local `library_path`

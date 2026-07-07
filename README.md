@@ -105,7 +105,9 @@ pip install -e ".[dev]"         # core + pytest (to run the test suite)
 python -m pip install -r requirements.txt
 python -m pip install google-generativeai            # a free-tier brain
 
-# 2. Configure secrets (never commit this file)
+# 2. Connect your brain + audio. Easiest: open the panel's Connections section,
+#    pick from the dropdowns, paste a key, press Connect (see docs/CONNECTIONS.md).
+#    Prefer files? Put keys in .env instead (a real env var always wins):
 cp .env.example .env
 #   add GEMINI_API_KEY (free) and FREESOUND_API_KEY (free) to start
 
@@ -125,6 +127,7 @@ python -m scripts.run_cli --selection
 Docs (full index: [`docs/README.md`](docs/README.md)):
 [`QUICKSTART`](docs/QUICKSTART.md) ·
 [`INSTALL`](docs/INSTALL.md) ·
+[`CONNECTIONS`](docs/CONNECTIONS.md) ·
 [`ARCHITECTURE`](docs/ARCHITECTURE.md) ·
 [`DEVELOPING`](docs/DEVELOPING.md) ·
 [`LONG_VIDEOS`](docs/LONG_VIDEOS.md) ·
@@ -172,8 +175,10 @@ soundsPlaceAI/
 
 ## Security & privacy
 
-- All credentials are read from environment variables / `.env` — **never** hard-coded. Secret
-  values are redacted from every log line.
+- Credentials come from environment variables / `.env`, or from keys you **Connect** in the
+  panel (stored locally in `connections.json` with owner-only permissions; a real env var
+  always wins). Nothing is **ever** hard-coded, and secret values are redacted from every log
+  line. See [`docs/CONNECTIONS.md`](docs/CONNECTIONS.md).
 - Only downscaled key-frames (not your footage) leave the machine, and only when you run the
   brain step. Choose a fully local pipeline (local sound folder + a self-hosted brain) if you
   need zero data egress.
