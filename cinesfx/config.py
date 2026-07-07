@@ -89,9 +89,23 @@ class AppConfig:
 
     @staticmethod
     def secret(env_key: str) -> Optional[str]:
-        """Read a secret from the environment; returns ``None`` if unset/blank."""
+        """Return a secret by env-var name, or ``None`` if unset.
+
+        Resolution order: real environment variable (incl. ``.env``) first, then
+        the local UI-managed credential store (so keys the user connected in the
+        panel work everywhere, including the CLI), without ever overriding an
+        explicitly-set environment variable.
+        """
         value = os.environ.get(env_key, "").strip()
-        return value or None
+        if value:
+            return value
+        try:
+            from cinesfx.credentials import get_credential
+
+            stored = get_credential(env_key)
+        except Exception:  # noqa: BLE001 - credential store is optional
+            stored = None
+        return stored or None
 
     def require_secret(self, env_key: str) -> str:
         """Return a required secret or raise a clear, actionable error."""
