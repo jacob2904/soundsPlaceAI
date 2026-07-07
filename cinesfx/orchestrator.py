@@ -251,11 +251,19 @@ class Orchestrator:
 
     def _brain_context(self, clip: ClipSelection) -> dict[str, Any]:
         placement = self._config.placement()
+        analysis = self._config.analysis()
+        brain_frames = analysis.get("brain_frames_per_scene")
         return {
             "clip_name": clip.name,
             "duration_seconds": clip.duration_seconds,
             "max_cues_per_scene": int(placement.get("max_cues_per_scene", 4)),
             "style": placement.get("style", "natural, filmic"),
+            # Token-efficiency knobs consumed by the brain providers.
+            "brain_frames_per_scene": (
+                int(brain_frames) if brain_frames is not None else 1
+            ),
+            "max_images_per_request": int(analysis.get("max_images_per_request", 12)),
+            "image_detail": str(analysis.get("image_detail", "low")),
         }
 
     @staticmethod

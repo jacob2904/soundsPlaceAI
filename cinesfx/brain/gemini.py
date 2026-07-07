@@ -49,7 +49,12 @@ class GeminiBrain(BrainProvider):
 
         prompt = build_user_prompt(scenes, context)
         parts: list[Any] = [prompt]
-        for image_path in self._collect_images(scenes):
+        images = self._collect_images(
+            scenes,
+            per_scene_limit=context.get("brain_frames_per_scene"),
+            max_total=context.get("max_images_per_request"),
+        )
+        for image_path in images:
             try:
                 parts.append(Image.open(image_path))
             except OSError as exc:  # skip unreadable frame, keep going

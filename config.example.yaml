@@ -58,9 +58,13 @@ analysis:
   detector: content                   # content | adaptive
   threshold: 27.0                     # PySceneDetect sensitivity
   downscale_factor: 2                 # >1 = analyse smaller frames = faster
-  frames_per_scene: 2                 # key-frames sent to the brain per shot
+  frames_per_scene: 1                 # key-frames extracted per shot (1 = cheapest)
   keyframe_width: 512                 # px; downscaled frames keep uploads tiny
   min_scene_seconds: 0.4              # ignore ultra-short flashes
+  # ---- AI token cost controls (images dominate vision-model cost) ----
+  brain_frames_per_scene: 1           # images actually SENT to the AI per scene
+  max_images_per_request: 12          # hard cap on images per AI call
+  image_detail: low                   # OpenAI vision detail: 'low' is far cheaper
   # ---- Long-clip handling (keeps hour-long videos fast & bounded) ----
   max_scenes: 400                     # cap: extra shots are merged, keeping full coverage
   long_clip_threshold_seconds: 600    # clips longer than this use frame-skipping

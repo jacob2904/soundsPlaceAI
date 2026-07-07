@@ -36,7 +36,7 @@ class SceneAgent:
         self._detector = str(config.get("detector", "content")).lower()
         self._threshold = float(config.get("threshold", 27.0))
         self._downscale = int(config.get("downscale_factor", 2))
-        self._frames_per_scene = max(1, int(config.get("frames_per_scene", 2)))
+        self._frames_per_scene = max(1, int(config.get("frames_per_scene", 1)))
         self._keyframe_width = int(config.get("keyframe_width", 512))
         self._min_scene_seconds = float(config.get("min_scene_seconds", 0.4))
         # Long-clip controls: keep whole-video coverage bounded and fast.

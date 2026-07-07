@@ -44,12 +44,24 @@ class OpenAIBrain(BrainProvider):
         client = OpenAI(api_key=self._api_key)
         prompt = build_user_prompt(scenes, context)
 
+        # 'low' detail bills a small, fixed token cost per image regardless of
+        # size — a big saving for scene-understanding where fine detail is
+        # unnecessary. Override via analysis.image_detail if you need 'high'.
+        detail = str(context.get("image_detail", "low"))
+        images = self._collect_images(
+            scenes,
+            per_scene_limit=context.get("brain_frames_per_scene"),
+            max_total=context.get("max_images_per_request"),
+        )
         content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
-        for image_path in self._collect_images(scenes):
+        for image_path in images:
             data_url = self._encode_image(image_path)
             if data_url:
                 content.append(
-                    {"type": "image_url", "image_url": {"url": data_url}}
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": data_url, "detail": detail},
+                    }
                 )
 
         try:

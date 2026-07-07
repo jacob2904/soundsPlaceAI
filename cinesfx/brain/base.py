@@ -42,11 +42,38 @@ class BrainProvider(abc.ABC):
         """
 
     @staticmethod
-    def _collect_images(scenes: list[Scene]) -> list[Path]:
-        """Return all key-frame image paths across ``scenes`` in order."""
+    def _collect_images(
+        scenes: list[Scene],
+        per_scene_limit: int | None = None,
+        max_total: int | None = None,
+    ) -> list[Path]:
+        """Return key-frame image paths across ``scenes``, in order.
+
+        Fewer images means fewer (expensive) vision tokens, so this can trim the
+        set two ways while keeping representative coverage:
+
+        Args:
+            per_scene_limit: Max images to send per scene (evenly sampled, so a
+                limit of 1 keeps the middle/most representative frame). ``None``
+                keeps every extracted frame.
+            max_total: Hard cap on the images for the whole request (evenly
+                sampled across all scenes). ``None`` means no cap.
+        """
         images: list[Path] = []
         for scene in scenes:
-            for keyframe in scene.keyframes:
-                if keyframe.image_path.exists():
-                    images.append(keyframe.image_path)
-        return images
+            frames = [
+                keyframe.image_path
+                for keyframe in scene.keyframes
+                if keyframe.image_path.exists()
+            ]
+            images.extend(_sample_evenly(frames, per_scene_limit))
+        return _sample_evenly(images, max_total)
+
+
+def _sample_evenly(items: list[Path], limit: int | None) -> list[Path]:
+    """Return at most ``limit`` items, evenly spaced (middle-of-bucket biased)."""
+    count = len(items)
+    if not limit or limit <= 0 or count <= limit:
+        return list(items)
+    step = count / limit
+    return [items[min(count - 1, int(index * step + step / 2))] for index in range(limit)]

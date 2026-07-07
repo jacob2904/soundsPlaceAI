@@ -44,8 +44,13 @@ class ClaudeBrain(BrainProvider):
         client = anthropic.Anthropic(api_key=self._api_key)
         prompt = build_user_prompt(scenes, context)
 
+        images = self._collect_images(
+            scenes,
+            per_scene_limit=context.get("brain_frames_per_scene"),
+            max_total=context.get("max_images_per_request"),
+        )
         content: list[dict[str, Any]] = []
-        for image_path in self._collect_images(scenes):
+        for image_path in images:
             block = self._encode_image_block(image_path)
             if block:
                 content.append(block)
